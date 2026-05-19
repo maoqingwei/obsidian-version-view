@@ -1,6 +1,6 @@
 # Version View for Obsidian
 
-> **Note:** This is a community-maintained fork of the original [Version View](https://github.com/joeytoday/obsidian-version-view) plugin by [joeytoday](https://github.com/joeytoday). The original repository was missing the `main.js` file, so this plugin has been rebuilt from scratch using AI to provide a fully functional version with all features intact.
+> **Note:** This is a community-maintained fork of the original [Version View](https://github.com/maoqingwei/obsidian-version-view) plugin by [joeytoday](https://github.com/joeytoday). The original repository was missing the `main.js` file, so this plugin has been rebuilt from scratch using AI to provide a fully functional version with all features intact.
 
 A simple version control plugin for Obsidian. Save, manage, compare and restore file versions with an intuitive interface.
 
@@ -19,7 +19,7 @@ A simple version control plugin for Obsidian. Save, manage, compare and restore 
 
 ### Manual Installation
 
-1. Download `main.js`, `styles.css`, and `manifest.json` from the [latest release](https://github.com/joeytoday/obsidian-version-view/releases)
+1. Download `main.js`, `styles.css`, and `manifest.json` from the [latest release](https://github.com/maoqingwei/obsidian-version-view/releases)
 2. Create a folder `version-view` in your vault's `.obsidian/plugins/` directory
 3. Copy the downloaded files into the `version-view` folder
 4. Restart Obsidian
@@ -28,7 +28,7 @@ A simple version control plugin for Obsidian. Save, manage, compare and restore 
 ### BRAT Installation
 
 1. Install the [BRAT](https://github.com/TfTHacker/obsidian42-brat) plugin
-2. Add this repository: `https://github.com/joeytoday/obsidian-version-view`
+2. Add this repository: `https://github.com/maoqingwei/obsidian-version-view`
 
 ## Usage
 
