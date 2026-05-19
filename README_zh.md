@@ -1,6 +1,6 @@
 # Version View - Obsidian 版本管理插件
 
-> **说明：** 本插件是基于原作者 [joeytoday](https://github.com/joeytoday) 的 [Version View](https://github.com/joeytoday/obsidian-version-view) 插件重新构建的版本。原仓库缺少 `main.js` 文件，因此使用 AI 重新编写了完整代码，保留了所有原有功能并进行了优化。
+> **说明：** 本插件是基于原作者 [joeytoday](https://github.com/joeytoday) 的 [Version View](https://github.com/maoqingwei/obsidian-version-view) 插件重新构建的版本。原仓库缺少 `main.js` 文件，因此使用 AI 重新编写了完整代码，保留了所有原有功能并进行了优化。
 
 一个简单直观的 Obsidian 版本管理插件，支持保存、管理、对比和恢复文件版本。
 
@@ -19,7 +19,7 @@
 
 ### 方式一：手动安装（推荐）
 
-1. 从 [Releases](https://github.com/joeytoday/obsidian-version-view/releases) 下载以下文件：
+1. 从 [Releases](https://github.com/maoqingwei/obsidian-version-view/releases) 下载以下文件：
    - `main.js`
    - `styles.css`
    - `manifest.json`
@@ -42,7 +42,7 @@
 ### 方式二：BRAT 安装
 
 1. 安装 [BRAT](https://github.com/TfTHacker/obsidian42-brat) 插件
-2. 添加仓库地址：`https://github.com/joeytoday/obsidian-version-view`
+2. 添加仓库地址：`https://github.com/maoqingwei/obsidian-version-view`
 
 ## 使用方法
 
@@ -94,7 +94,7 @@ A：支持！该插件同时支持桌面端和移动端。
 - **插件名称**：Version View
 - **作者**：JoeyToday
 - **许可证**：MIT
-- **GitHub**：https://github.com/joeytoday/obsidian-version-view
+- **GitHub**：https://github.com/maoqingwei/obsidian-version-view
 
 ## 许可证
 
