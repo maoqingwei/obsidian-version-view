@@ -1,9 +1,9 @@
 {
   "id": "version-view",
   "name": "Version View",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "minAppVersion": "1.0.0",
-  "description": "A simple version control plugin for Obsidian. Save, manage, compare and restore file versions with an intuitive interface.",
+  "description": "A simple version control plugin. Save, manage, compare and restore file versions with an intuitive interface.",
   "author": "JoeyToday",
   "authorUrl": "https://github.com/joeytoday",
   "isDesktopOnly": false
