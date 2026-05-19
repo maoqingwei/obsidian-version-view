@@ -92,7 +92,8 @@ A：支持！该插件同时支持桌面端和移动端。
 ## 插件信息
 
 - **插件名称**：Version View
-- **作者**：JoeyToday
+- **原作者**：[joeytoday](https://github.com/joeytoday)
+- **维护者**：[maoqingwei](https://github.com/maoqingwei)
 - **许可证**：MIT
 - **GitHub**：https://github.com/maoqingwei/obsidian-version-view
 
