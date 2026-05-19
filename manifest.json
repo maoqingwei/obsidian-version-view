@@ -4,7 +4,7 @@
   "version": "1.0.1",
   "minAppVersion": "1.0.0",
   "description": "A simple version control plugin. Save, manage, compare and restore file versions with an intuitive interface.",
-  "author": "JoeyToday",
-  "authorUrl": "https://github.com/joeytoday",
+  "author": "maoqingwei",
+  "authorUrl": "https://github.com/maoqingwei",
   "isDesktopOnly": false
 }
