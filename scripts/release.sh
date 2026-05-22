@@ -14,6 +14,5 @@ fi
 git tag "$TAG"
 git push origin "$TAG"
 
-gh release create "$TAG" --title "$TAG" main.js styles.css manifest.json --notes ""
-
-echo "Release v$VERSION published: https://github.com/maoqingwei/obsidian-version-view/releases/tag/$TAG"
+echo "Tag $TAG pushed, Actions 会自动创建 Release 并上传附件"
+echo "进度查看: https://github.com/maoqingwei/obsidian-version-view/actions"
