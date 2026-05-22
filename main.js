@@ -789,6 +789,7 @@ class DiffModal extends obsidian.Modal {
                     oldCell.style.padding = '4px 12px';
                     oldCell.style.whiteSpace = 'pre-wrap';
                     oldCell.style.wordBreak = 'break-all';
+                    oldCell.style.userSelect = 'text';
                     oldCell.textContent = line;
                     
                     const newNumCell = row.createDiv();
@@ -805,6 +806,7 @@ class DiffModal extends obsidian.Modal {
                     newCell.style.padding = '4px 12px';
                     newCell.style.whiteSpace = 'pre-wrap';
                     newCell.style.wordBreak = 'break-all';
+                    newCell.style.userSelect = 'text';
                     newCell.textContent = line;
                     
                 } else if (group.type === 'removed') {
@@ -826,6 +828,7 @@ class DiffModal extends obsidian.Modal {
                     oldCell.style.wordBreak = 'break-all';
                     oldCell.style.color = '#ef4444';
                     oldCell.style.backgroundColor = 'rgba(239, 68, 68, 0.05)';
+                    oldCell.style.userSelect = 'text';
                     oldCell.textContent = line;
                     
                     const newNumCell = row.createDiv();
@@ -841,6 +844,7 @@ class DiffModal extends obsidian.Modal {
                     newCell.style.padding = '4px 12px';
                     newCell.style.whiteSpace = 'pre-wrap';
                     newCell.style.wordBreak = 'break-all';
+                    newCell.style.userSelect = 'text';
                     newCell.textContent = '';
                     
                 } else if (group.type === 'added') {
@@ -859,6 +863,7 @@ class DiffModal extends obsidian.Modal {
                     oldCell.style.padding = '4px 12px';
                     oldCell.style.whiteSpace = 'pre-wrap';
                     oldCell.style.wordBreak = 'break-all';
+                    oldCell.style.userSelect = 'text';
                     oldCell.textContent = '';
                     
                     const newNumCell = row.createDiv();
@@ -877,6 +882,7 @@ class DiffModal extends obsidian.Modal {
                     newCell.style.wordBreak = 'break-all';
                     newCell.style.color = '#22c55e';
                     newCell.style.backgroundColor = 'rgba(34, 197, 94, 0.05)';
+                    newCell.style.userSelect = 'text';
                     newCell.textContent = line;
                 }
             }
