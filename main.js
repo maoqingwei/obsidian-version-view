@@ -385,9 +385,10 @@ class VersionViewModal extends obsidian.Modal {
             const infoEl = leftEl.createDiv();
             infoEl.style.minWidth = '0';
             const dateStr = new Date(version.timestamp).toLocaleString();
-            infoEl.createEl('div', {text: version.name, style: 'font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;'});
+            infoEl.createEl('div', {text: version.name, cls: 'version-view-name'});
             if (version.description) {
-                infoEl.createEl('div', {text: version.description, style: 'font-size: 12px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;'});
+                const descEl = infoEl.createEl('div', {text: version.description, cls: 'version-view-description'});
+                descEl.title = version.description;
             }
             infoEl.createEl('small', {text: dateStr, style: 'color: var(--text-muted);'});
             
