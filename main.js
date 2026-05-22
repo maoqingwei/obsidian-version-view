@@ -96,7 +96,7 @@ class VersionViewPlugin extends obsidian.Plugin {
     
     async loadSettings() {
         this.settings = Object.assign({}, {
-            versionFolder: 'res/versions',
+            versionFolder: '.res/versions',
             maxVersions: 50,
             autoSave: false
         }, await this.loadData());
@@ -239,7 +239,7 @@ class VersionViewSettingTab extends obsidian.PluginSettingTab {
             .setName('版本存储文件夹')
             .setDesc('版本文件保存的相对路径')
             .addText(text => text
-                .setPlaceholder('res/versions')
+                .setPlaceholder('.res/versions')
                 .setValue(this.plugin.settings.versionFolder)
                 .onChange(async (value) => {
                     this.plugin.settings.versionFolder = value;
