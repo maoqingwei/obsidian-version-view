@@ -540,9 +540,8 @@ class EditVersionModal extends obsidian.Modal {
         descContainer.createEl('label', {text: '版本描述'});
         descContainer.style.display = 'block';
         
-        const descInput = contentEl.createEl('textarea', {
-            value: this.version.description || ''
-        });
+        const descInput = contentEl.createEl('textarea');
+        descInput.value = this.version.description || '';
         descInput.style.width = '100%';
         descInput.style.height = '100px';
         descInput.style.padding = '8px';
