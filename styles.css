@@ -282,3 +282,14 @@
 .version-view-diff-content::-webkit-scrollbar-thumb:hover {
     background-color: var(--background-modifier-hover);
 }
+
+/* Frontmatter diff styling - reduce spacing for YAML frontmatter blocks */
+.version-diff-frontmatter {
+    opacity: 0.75;
+}
+
+.version-diff-frontmatter > div:nth-child(2),
+.version-diff-frontmatter > div:nth-child(4) {
+    font-size: 12px;
+    line-height: 1.3;
+}

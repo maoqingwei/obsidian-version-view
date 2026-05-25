@@ -74,78 +74,61 @@ function computeLcsDiff(oldLines, newLines, startLine) {
     return temp;
 }
 
-// ========== 插件主类 ==========
-class VersionViewPlugin extends obsidian.Plugin {
-    async onload() {
-        await this.loadSettings();
-        
-        this.addRibbonIcon('clock', '版本视图', () => {
-            this.showVersionView();
-        });
-        
-        this.addCommand({
-            id: 'toggle-version-view',
-            name: '切换版本视图',
-            callback: () => {
-                this.showVersionView();
-            }
-        });
-        
-        this.addSettingTab(new VersionViewSettingTab(this.app, this));
+// ========== 版本存储服务 ==========
+class VersionService {
+    constructor(app, settings) {
+        this.app = app;
+        this.settings = settings;
     }
-    
-    async loadSettings() {
-        this.settings = Object.assign({}, {
-            versionFolder: '.res/versions',
-            maxVersions: 50,
-            autoSave: false
-        }, await this.loadData());
+
+    _getVersionDir(file) {
+        const safePath = file.path.replace(/\//g, '_');
+        return `${this.settings.versionFolder}/${safePath}`;
     }
-    
-    async saveSettings() {
-        await this.saveData(this.settings);
+
+    _getIndexPath(file) {
+        return `${this._getVersionDir(file)}/versions.json`;
     }
-    
-    async showVersionView() {
-        const activeFile = this.app.workspace.getActiveFile();
-        if (!activeFile) {
-            new obsidian.Notice('请先打开一个笔记');
-            return;
+
+    async _ensureDir(dirPath) {
+        if (!await this.app.vault.adapter.exists(dirPath)) {
+            await this.app.vault.createFolder(dirPath);
         }
-        
-        const modal = new VersionViewModal(this.app, this, activeFile);
-        modal.open();
     }
-    
-    async saveVersion(file, content, name, description) {
-        const folderPath = this.settings.versionFolder;
-        
+
+    async _readIndex(file) {
+        const indexPath = this._getIndexPath(file);
         try {
-            const fileDir = file.path.replace(/\//g, '_');
-            const fullFolderPath = `${folderPath}/${fileDir}`;
-            
-            if (!await this.app.vault.adapter.exists(folderPath)) {
-                await this.app.vault.createFolder(folderPath);
+            if (await this.app.vault.adapter.exists(indexPath)) {
+                const data = await this.app.vault.adapter.read(indexPath);
+                return JSON.parse(data);
             }
-            
-            if (!await this.app.vault.adapter.exists(fullFolderPath)) {
-                await this.app.vault.createFolder(fullFolderPath);
-            }
-            
-            const timestamp = Date.now();
-            const safeName = name.replace(/[<>:"/\\|?*\x00-\x1F]/g, '_');
-            const filePath = `${fullFolderPath}/${timestamp}_${safeName}.json`;
-            
-            const versionData = {
-                timestamp: timestamp,
+        } catch (e) {
+            console.error('[VersionView] Failed to read version index:', e);
+        }
+        return { nextId: 1, versions: [] };
+    }
+
+    async _writeIndex(file, data) {
+        await this.app.vault.adapter.write(this._getIndexPath(file), JSON.stringify(data, null, 2));
+    }
+
+    async saveVersion(file, content, name, description) {
+        try {
+            await this._ensureDir(this.settings.versionFolder);
+            await this._ensureDir(this._getVersionDir(file));
+
+            const index = await this._readIndex(file);
+            const version = {
+                id: index.nextId++,
                 name: name,
                 description: description || '',
-                content: content,
-                originalPath: file.path
+                timestamp: Date.now(),
+                content: content
             };
-            
-            await this.app.vault.create(filePath, JSON.stringify(versionData, null, 2));
-            
+            index.versions.unshift(version);
+            await this._writeIndex(file, index);
+
             new obsidian.Notice(`版本 "${name}" 已保存`);
             return true;
         } catch (error) {
@@ -154,18 +137,18 @@ class VersionViewPlugin extends obsidian.Plugin {
             return false;
         }
     }
-    
-    async updateVersion(version, newName, newDescription) {
+
+    async updateVersion(file, versionId, newName, newDescription) {
         try {
-            const versionData = {
-                timestamp: version.timestamp,
-                name: newName,
-                description: newDescription,
-                content: version.content,
-                originalPath: version.originalPath
-            };
-            
-            await this.app.vault.adapter.write(version.filePath, JSON.stringify(versionData, null, 2));
+            const index = await this._readIndex(file);
+            const version = index.versions.find(v => v.id === versionId);
+            if (!version) {
+                new obsidian.Notice('版本不存在');
+                return false;
+            }
+            version.name = newName;
+            version.description = newDescription;
+            await this._writeIndex(file, index);
             new obsidian.Notice('版本信息已更新');
             return true;
         } catch (error) {
@@ -173,48 +156,28 @@ class VersionViewPlugin extends obsidian.Plugin {
             return false;
         }
     }
-    
+
     async getVersions(file) {
-        const folderPath = `${this.settings.versionFolder}/${file.path.replace(/\//g, '_')}`;
-        
-        if (!await this.app.vault.adapter.exists(folderPath)) {
-            return [];
-        }
-        
-        const files = await this.app.vault.adapter.list(folderPath);
-        const versionFiles = files.files.filter(f => f.endsWith('.json'));
-        
-        const versions = [];
-        for (const filePath of versionFiles) {
-            try {
-                const content = await this.app.vault.adapter.read(filePath);
-                const versionData = JSON.parse(content);
-                versionData.filePath = filePath;
-                if (!versionData.description) versionData.description = '';
-                versions.push(versionData);
-            } catch (error) {
-                console.error('读取版本失败:', error);
-            }
-        }
-        
-        versions.sort((a, b) => b.timestamp - a.timestamp);
-        return versions;
+        const index = await this._readIndex(file);
+        return index.versions.sort((a, b) => b.timestamp - a.timestamp);
     }
-    
-    async restoreVersion(version, file) {
+
+    async restoreVersion(versionMeta, file) {
         try {
-            await this.app.vault.modify(file, version.content);
-            new obsidian.Notice(`已恢复到版本 "${version.name}"`);
+            await this.app.vault.modify(file, versionMeta.content);
+            new obsidian.Notice(`已恢复到版本 "${versionMeta.name}"`);
             return true;
         } catch (error) {
             new obsidian.Notice(`恢复版本失败: ${error.message}`);
             return false;
         }
     }
-    
-    async deleteVersion(version) {
+
+    async deleteVersion(file, versionId) {
         try {
-            await this.app.vault.adapter.remove(version.filePath);
+            const index = await this._readIndex(file);
+            index.versions = index.versions.filter(v => v.id !== versionId);
+            await this._writeIndex(file, index);
             new obsidian.Notice('版本已删除');
             return true;
         } catch (error) {
@@ -224,17 +187,72 @@ class VersionViewPlugin extends obsidian.Plugin {
     }
 }
 
+// ========== 插件主类 ==========
+class VersionViewPlugin extends obsidian.Plugin {
+    async onload() {
+        await this.loadSettings();
+
+        this.versionService = new VersionService(this.app, this.settings);
+
+        this.addRibbonIcon('clock', '版本视图', () => {
+            this.showVersionView();
+        });
+
+        this.addCommand({
+            id: 'toggle-version-view',
+            name: '切换版本视图',
+            callback: () => {
+                this.showVersionView();
+            }
+        });
+
+        this.addSettingTab(new VersionViewSettingTab(this.app, this));
+    }
+
+    async loadSettings() {
+        this.settings = Object.assign({}, {
+            versionFolder: '.res/versions',
+            maxVersions: 50,
+            autoSave: false
+        }, await this.loadData());
+    }
+
+    async saveSettings() {
+        await this.saveData(this.settings);
+    }
+
+    async showVersionView() {
+        const activeFile = this.app.workspace.getActiveFile();
+        if (!activeFile) {
+            new obsidian.Notice('请先打开一个笔记');
+            return;
+        }
+
+        const modal = new VersionViewModal(this.app, activeFile, {
+            load: () => this.versionService.getVersions(activeFile),
+            save: async (name) => {
+                const content = await this.app.vault.read(activeFile);
+                return this.versionService.saveVersion(activeFile, content, name, '');
+            },
+            update: (version, name, desc) => this.versionService.updateVersion(activeFile, version.id, name, desc),
+            restore: (version) => this.versionService.restoreVersion(version, activeFile),
+            delete: (version) => this.versionService.deleteVersion(activeFile, version.id)
+        });
+        modal.open();
+    }
+}
+
 // ========== 设置面板 ==========
 class VersionViewSettingTab extends obsidian.PluginSettingTab {
     constructor(app, plugin) {
         super(app, plugin);
         this.plugin = plugin;
     }
-    
+
     display() {
         const {containerEl} = this;
         containerEl.empty();
-        
+
         new obsidian.Setting(containerEl)
             .setName('版本存储文件夹')
             .setDesc('版本文件保存的相对路径')
@@ -245,7 +263,7 @@ class VersionViewSettingTab extends obsidian.PluginSettingTab {
                     this.plugin.settings.versionFolder = value;
                     await this.plugin.saveSettings();
                 }));
-        
+
         new obsidian.Setting(containerEl)
             .setName('最大版本数量')
             .setDesc('超出后自动删除旧版本')
@@ -262,27 +280,27 @@ class VersionViewSettingTab extends obsidian.PluginSettingTab {
 
 // ========== 版本视图模态框 ==========
 class VersionViewModal extends obsidian.Modal {
-    constructor(app, plugin, file) {
+    constructor(app, file, callbacks) {
         super(app);
-        this.plugin = plugin;
         this.file = file;
+        this.callbacks = callbacks;
         this.versions = [];
         this.selectedVersions = [];
     }
-    
+
     async onOpen() {
         const {contentEl} = this;
         contentEl.empty();
         contentEl.addClass('version-view-modal');
-        
+
         const titleEl = contentEl.createEl('h2', {text: `版本视图: ${this.file.name}`});
         titleEl.style.marginBottom = '12px';
-        
+
         const inputContainer = contentEl.createDiv();
         inputContainer.style.display = 'flex';
         inputContainer.style.gap = '10px';
         inputContainer.style.marginBottom = '16px';
-        
+
         const nameInput = inputContainer.createEl('input', {
             type: 'text',
             attr: {placeholder: '版本名称（可选）'}
@@ -292,7 +310,7 @@ class VersionViewModal extends obsidian.Modal {
         nameInput.style.borderRadius = '4px';
         nameInput.style.border = '1px solid var(--background-modifier-border)';
         nameInput.style.backgroundColor = 'var(--background-modifier-form-field)';
-        
+
         const saveBtn = inputContainer.createEl('button', {
             text: '保存此版本'
         });
@@ -302,13 +320,11 @@ class VersionViewModal extends obsidian.Modal {
         saveBtn.style.backgroundColor = 'var(--interactive-accent)';
         saveBtn.style.color = 'var(--text-on-accent)';
         saveBtn.style.border = 'none';
-        
+
         saveBtn.addEventListener('click', async () => {
             try {
                 const name = nameInput.value.trim() || `V${this.versions.length + 1}`;
-                const content = await this.app.vault.read(this.file);
-                const success = await this.plugin.saveVersion(this.file, content, name);
-                
+                const success = await this.callbacks.save(name);
                 if (success) {
                     await this.loadVersions();
                     nameInput.value = '';
@@ -317,7 +333,7 @@ class VersionViewModal extends obsidian.Modal {
                 new obsidian.Notice(`保存失败: ${error.message}`);
             }
         });
-        
+
         const compareSelectedBtn = contentEl.createEl('button', {
             text: '🔍 对比选中版本'
         });
@@ -329,7 +345,7 @@ class VersionViewModal extends obsidian.Modal {
         compareSelectedBtn.style.borderRadius = '4px';
         compareSelectedBtn.style.border = '1px solid var(--background-modifier-border)';
         compareSelectedBtn.style.backgroundColor = 'var(--background-secondary)';
-        
+
         compareSelectedBtn.addEventListener('click', () => {
             if (this.selectedVersions.length === 2) {
                 const [v1, v2] = this.selectedVersions;
@@ -337,30 +353,30 @@ class VersionViewModal extends obsidian.Modal {
                 diffModal.open();
             }
         });
-        
+
         this.compareSelectedBtn = compareSelectedBtn;
         contentEl.appendChild(compareSelectedBtn);
-        
+
         this.versionListEl = contentEl.createDiv();
         this.versionListEl.style.marginTop = '10px';
         this.versionListEl.style.maxHeight = '60vh';
         this.versionListEl.style.overflowY = 'auto';
-        
+
         await this.loadVersions();
     }
-    
+
     async loadVersions() {
         this.versionListEl.empty();
-        this.versions = await this.plugin.getVersions(this.file);
+        this.versions = await this.callbacks.load();
         this.selectedVersions = [];
         this.checkboxes = [];
         this.compareSelectedBtn.style.display = 'none';
-        
+
         if (this.versions.length === 0) {
             this.versionListEl.createEl('p', {text: '暂无版本'});
             return;
         }
-        
+
         for (const version of this.versions) {
             const itemEl = this.versionListEl.createDiv();
             itemEl.style.padding = '12px';
@@ -368,20 +384,20 @@ class VersionViewModal extends obsidian.Modal {
             itemEl.style.display = 'flex';
             itemEl.style.justifyContent = 'space-between';
             itemEl.style.alignItems = 'center';
-            
+
             const leftEl = itemEl.createDiv();
             leftEl.style.display = 'flex';
             leftEl.style.alignItems = 'center';
             leftEl.style.gap = '10px';
             leftEl.style.flex = '1';
             leftEl.style.minWidth = '0';
-            
+
             const checkbox = leftEl.createEl('input', {type: 'checkbox'});
             checkbox.style.width = '18px';
             checkbox.style.height = '18px';
             checkbox.style.cursor = 'pointer';
             checkbox.style.flexShrink = '0';
-            
+
             const infoEl = leftEl.createDiv();
             infoEl.style.minWidth = '0';
             const dateStr = new Date(version.timestamp).toLocaleString();
@@ -391,12 +407,12 @@ class VersionViewModal extends obsidian.Modal {
                 descEl.title = version.description;
             }
             infoEl.createEl('small', {text: dateStr, style: 'color: var(--text-muted);'});
-            
+
             const buttonsEl = itemEl.createDiv();
             buttonsEl.style.display = 'flex';
             buttonsEl.style.gap = '6px';
             buttonsEl.style.flexShrink = '0';
-            
+
             const editBtn = buttonsEl.createEl('button', {text: '✏️'});
             editBtn.style.padding = '4px 6px';
             editBtn.style.cursor = 'pointer';
@@ -405,9 +421,12 @@ class VersionViewModal extends obsidian.Modal {
             editBtn.style.backgroundColor = 'var(--background-secondary)';
             editBtn.title = '编辑';
             editBtn.addEventListener('click', () => {
-                new EditVersionModal(this.app, version, this.plugin, () => this.loadVersions()).open();
+                new EditVersionModal(this.app, version, {
+                    update: (v, name, desc) => this.callbacks.update(v, name, desc),
+                    onDone: () => this.loadVersions()
+                }).open();
             });
-            
+
             const diffCurrentBtn = buttonsEl.createEl('button', {text: '🔍'});
             diffCurrentBtn.style.padding = '4px 6px';
             diffCurrentBtn.style.cursor = 'pointer';
@@ -426,7 +445,7 @@ class VersionViewModal extends obsidian.Modal {
                 const diffModal = new DiffModal(this.app, version, currentVersion);
                 diffModal.open();
             });
-            
+
             const restoreBtn = buttonsEl.createEl('button', {text: '↩️'});
             restoreBtn.style.padding = '4px 6px';
             restoreBtn.style.cursor = 'pointer';
@@ -436,11 +455,11 @@ class VersionViewModal extends obsidian.Modal {
             restoreBtn.title = '恢复';
             restoreBtn.addEventListener('click', async () => {
                 if (confirm(`确定要恢复到版本 "${version.name}" 吗？`)) {
-                    await this.plugin.restoreVersion(version, this.file);
+                    await this.callbacks.restore(version);
                     this.close();
                 }
             });
-            
+
             const deleteBtn = buttonsEl.createEl('button', {text: '🗑️'});
             deleteBtn.style.padding = '4px 6px';
             deleteBtn.style.cursor = 'pointer';
@@ -450,13 +469,13 @@ class VersionViewModal extends obsidian.Modal {
             deleteBtn.title = '删除';
             deleteBtn.addEventListener('click', async () => {
                 if (confirm(`确定要删除版本 "${version.name}" 吗？`)) {
-                    await this.plugin.deleteVersion(version);
+                    await this.callbacks.delete(version);
                     await this.loadVersions();
                 }
             });
-            
+
             this.checkboxes.push({ el: checkbox, version: version });
-            
+
             checkbox.addEventListener('change', () => {
                 if (checkbox.checked) {
                     if (this.selectedVersions.length >= 2) {
@@ -468,15 +487,15 @@ class VersionViewModal extends obsidian.Modal {
                 } else {
                     this.selectedVersions = this.selectedVersions.filter(v => v.timestamp !== version.timestamp);
                 }
-                
+
                 this.updateCompareButton();
                 this.updateCheckboxStates();
             });
         }
-        
+
         this.updateCheckboxStates();
     }
-    
+
     updateCheckboxStates() {
         const isFull = this.selectedVersions.length >= 2;
         for (const item of this.checkboxes) {
@@ -489,7 +508,7 @@ class VersionViewModal extends obsidian.Modal {
             }
         }
     }
-    
+
     updateCompareButton() {
         if (this.selectedVersions.length === 2) {
             this.compareSelectedBtn.style.display = 'block';
@@ -498,7 +517,7 @@ class VersionViewModal extends obsidian.Modal {
             this.compareSelectedBtn.style.display = 'none';
         }
     }
-    
+
     onClose() {
         const {contentEl} = this;
         contentEl.empty();
@@ -507,24 +526,23 @@ class VersionViewModal extends obsidian.Modal {
 
 // ========== 编辑版本模态框 ==========
 class EditVersionModal extends obsidian.Modal {
-    constructor(app, version, plugin, onUpdate) {
+    constructor(app, version, callbacks) {
         super(app);
         this.version = version;
-        this.plugin = plugin;
-        this.onUpdate = onUpdate;
+        this.callbacks = callbacks;
     }
-    
+
     onOpen() {
         const {contentEl} = this;
         contentEl.empty();
-        
+
         contentEl.createEl('h2', {text: '编辑版本'});
-        
+
         const nameContainer = contentEl.createDiv();
         nameContainer.style.marginBottom = '16px';
         nameContainer.createEl('label', {text: '版本名称'});
         nameContainer.style.display = 'block';
-        
+
         const nameInput = contentEl.createEl('input', {
             type: 'text',
             value: this.version.name
@@ -535,12 +553,12 @@ class EditVersionModal extends obsidian.Modal {
         nameInput.style.borderRadius = '4px';
         nameInput.style.border = '1px solid var(--background-modifier-border)';
         nameInput.style.backgroundColor = 'var(--background-modifier-form-field)';
-        
+
         const descContainer = contentEl.createDiv();
         descContainer.style.marginBottom = '16px';
         descContainer.createEl('label', {text: '版本描述'});
         descContainer.style.display = 'block';
-        
+
         const descInput = contentEl.createEl('textarea');
         descInput.value = this.version.description || '';
         descInput.style.width = '100%';
@@ -551,12 +569,12 @@ class EditVersionModal extends obsidian.Modal {
         descInput.style.border = '1px solid var(--background-modifier-border)';
         descInput.style.backgroundColor = 'var(--background-modifier-form-field)';
         descInput.style.resize = 'vertical';
-        
+
         const btnContainer = contentEl.createDiv();
         btnContainer.style.display = 'flex';
         btnContainer.style.gap = '10px';
         btnContainer.style.justifyContent = 'flex-end';
-        
+
         const cancelBtn = btnContainer.createEl('button', {text: '取消'});
         cancelBtn.style.padding = '8px 16px';
         cancelBtn.style.cursor = 'pointer';
@@ -564,7 +582,7 @@ class EditVersionModal extends obsidian.Modal {
         cancelBtn.style.border = '1px solid var(--background-modifier-border)';
         cancelBtn.style.backgroundColor = 'var(--background-secondary)';
         cancelBtn.addEventListener('click', () => this.close());
-        
+
         const saveBtn = btnContainer.createEl('button', {text: '保存'});
         saveBtn.style.padding = '8px 16px';
         saveBtn.style.cursor = 'pointer';
@@ -578,15 +596,15 @@ class EditVersionModal extends obsidian.Modal {
                 new obsidian.Notice('版本名称不能为空');
                 return;
             }
-            
-            const success = await this.plugin.updateVersion(this.version, newName, descInput.value.trim());
+
+            const success = await this.callbacks.update(this.version, newName, descInput.value.trim());
             if (success) {
-                this.onUpdate();
+                this.callbacks.onDone();
                 this.close();
             }
         });
     }
-    
+
     onClose() {
         const {contentEl} = this;
         contentEl.empty();
@@ -594,6 +612,28 @@ class EditVersionModal extends obsidian.Modal {
 }
 
 // ========== 差异对比模态框 ==========
+class FrontmatterTracker {
+    constructor() {
+        this._inside = false;
+        this._seen = false;
+    }
+
+    next(lineText) {
+        const stripped = lineText.trim();
+        if (stripped === '---') {
+            if (!this._seen) {
+                this._seen = true;
+                this._inside = true;
+                return true;
+            } else if (this._inside) {
+                this._inside = false;
+                return true;
+            }
+        }
+        return this._inside;
+    }
+}
+
 class DiffModal extends obsidian.Modal {
     constructor(app, version1, version2) {
         super(app);
@@ -602,21 +642,21 @@ class DiffModal extends obsidian.Modal {
         this.showOnlyDiff = true;
         this.isFullscreen = false;
     }
-    
+
     async onOpen() {
         const {contentEl} = this;
         contentEl.empty();
-        
+
         this.diff = computeDiff(this.version1.content, this.version2.content);
         this.groups = this.groupDiffLines(this.diff);
-        
+
         this.renderContent();
     }
-    
+
     renderContent() {
         const {contentEl} = this;
         contentEl.empty();
-        
+
         if (this.isFullscreen) {
             contentEl.style.position = 'fixed';
             contentEl.style.top = '0';
@@ -638,40 +678,37 @@ class DiffModal extends obsidian.Modal {
             contentEl.style.padding = '';
             contentEl.style.overflow = '';
         }
-        
-        // 标题栏
+
         const headerEl = contentEl.createDiv();
         headerEl.style.display = 'flex';
         headerEl.style.justifyContent = 'space-between';
         headerEl.style.alignItems = 'center';
         headerEl.style.marginBottom = '16px';
-        
+
         headerEl.createEl('h2', {text: `版本对比: ${this.version1.name} vs ${this.version2.name}`});
-        
+
         const controlsEl = headerEl.createDiv();
         controlsEl.style.display = 'flex';
         controlsEl.style.gap = '10px';
         controlsEl.style.alignItems = 'center';
-        
-        // 只显示差异开关
+
         const diffToggleLabel = controlsEl.createEl('label');
         diffToggleLabel.style.display = 'flex';
         diffToggleLabel.style.alignItems = 'center';
         diffToggleLabel.style.gap = '6px';
         diffToggleLabel.style.cursor = 'pointer';
         diffToggleLabel.style.fontSize = '13px';
-        
+
         const diffToggle = diffToggleLabel.createEl('input', {type: 'checkbox'});
         diffToggle.checked = this.showOnlyDiff;
         diffToggle.addEventListener('change', () => {
             this.showOnlyDiff = diffToggle.checked;
             this.renderContent();
         });
-        
+
         diffToggleLabel.appendChild(document.createTextNode('只显示差异'));
         controlsEl.appendChild(diffToggleLabel);
-        
-        // 全屏按钮
+
         const fullscreenBtn = controlsEl.createEl('button', {
             text: this.isFullscreen ? '退出全屏' : '全屏'
         });
@@ -685,8 +722,7 @@ class DiffModal extends obsidian.Modal {
             this.renderContent();
         });
         controlsEl.appendChild(fullscreenBtn);
-        
-        // 关闭按钮
+
         const closeBtn = controlsEl.createEl('button', {text: '✕'});
         closeBtn.style.padding = '4px 10px';
         closeBtn.style.cursor = 'pointer';
@@ -695,13 +731,12 @@ class DiffModal extends obsidian.Modal {
         closeBtn.style.backgroundColor = 'var(--background-secondary)';
         closeBtn.addEventListener('click', () => this.close());
         controlsEl.appendChild(closeBtn);
-        
-        // 渲染差异表
+
         const diffContainer = contentEl.createDiv();
         diffContainer.style.borderRadius = '8px';
         diffContainer.style.border = '1px solid var(--background-modifier-border)';
         diffContainer.style.overflow = 'hidden';
-        
+
         const headerRow = diffContainer.createDiv();
         headerRow.style.display = 'flex';
         headerRow.style.backgroundColor = 'var(--background-secondary)';
@@ -709,37 +744,37 @@ class DiffModal extends obsidian.Modal {
         headerRow.style.fontWeight = '600';
         headerRow.style.fontSize = '12px';
         headerRow.style.color = 'var(--text-muted)';
-        
+
         const lineNumHeader1 = headerRow.createDiv();
         lineNumHeader1.style.width = '50px';
         lineNumHeader1.style.padding = '8px';
         lineNumHeader1.style.textAlign = 'center';
         lineNumHeader1.textContent = '行号';
-        
+
         const oldHeader = headerRow.createDiv();
         oldHeader.style.flex = '1';
         oldHeader.style.padding = '8px 12px';
         oldHeader.textContent = this.version1.name;
-        
+
         const lineNumHeader2 = headerRow.createDiv();
         lineNumHeader2.style.width = '50px';
         lineNumHeader2.style.padding = '8px';
         lineNumHeader2.style.textAlign = 'center';
         lineNumHeader2.textContent = '行号';
-        
+
         const newHeader = headerRow.createDiv();
         newHeader.style.flex = '1';
         newHeader.style.padding = '8px 12px';
         newHeader.textContent = this.version2.name;
-        
+
         const contentContainer = diffContainer.createDiv();
         contentContainer.style.maxHeight = this.isFullscreen ? 'calc(100vh - 200px)' : '65vh';
         contentContainer.style.overflowY = 'auto';
-        
-        const filteredGroups = this.showOnlyDiff 
+
+        const filteredGroups = this.showOnlyDiff
             ? this.groups.filter(g => g.type !== 'equal')
             : this.groups;
-        
+
         if (filteredGroups.length === 0) {
             contentContainer.createDiv({
                 text: '两个版本完全相同',
@@ -747,13 +782,11 @@ class DiffModal extends obsidian.Modal {
             });
             return;
         }
-        
+
         let oldLineNum = 1;
         let newLineNum = 1;
-        
-        // 计算起始行号
+
         if (this.showOnlyDiff) {
-            // 找到第一个差异组的位置
             for (const g of this.groups) {
                 if (g.type !== 'equal') break;
                 const lines = g.value.split('\n');
@@ -761,20 +794,27 @@ class DiffModal extends obsidian.Modal {
                 newLineNum += lines.length;
             }
         }
-        
+
+        const oldFm = new FrontmatterTracker();
+        const newFm = new FrontmatterTracker();
+
         for (const group of filteredGroups) {
             const lines = group.value.split('\n');
-            
+
             for (const line of lines) {
                 const row = contentContainer.createDiv();
                 row.style.display = 'flex';
                 row.style.borderBottom = '1px solid var(--background-modifier-border)';
                 row.style.fontSize = '13px';
                 row.style.fontFamily = 'var(--font-monospace, monospace)';
-                
+
                 if (group.type === 'equal') {
+                    const isFm = oldFm.next(line);
+                    newFm.next(line);
+                    if (isFm) row.addClass('version-diff-frontmatter');
+
                     row.style.backgroundColor = 'transparent';
-                    
+
                     const oldNumCell = row.createDiv();
                     oldNumCell.style.width = '50px';
                     oldNumCell.style.padding = '4px';
@@ -783,7 +823,7 @@ class DiffModal extends obsidian.Modal {
                     oldNumCell.style.userSelect = 'none';
                     oldNumCell.textContent = oldLineNum;
                     oldLineNum++;
-                    
+
                     const oldCell = row.createDiv();
                     oldCell.style.flex = '1';
                     oldCell.style.padding = '4px 12px';
@@ -791,7 +831,7 @@ class DiffModal extends obsidian.Modal {
                     oldCell.style.wordBreak = 'break-all';
                     oldCell.style.userSelect = 'text';
                     oldCell.textContent = line;
-                    
+
                     const newNumCell = row.createDiv();
                     newNumCell.style.width = '50px';
                     newNumCell.style.padding = '4px';
@@ -800,7 +840,7 @@ class DiffModal extends obsidian.Modal {
                     newNumCell.style.userSelect = 'none';
                     newNumCell.textContent = newLineNum;
                     newLineNum++;
-                    
+
                     const newCell = row.createDiv();
                     newCell.style.flex = '1';
                     newCell.style.padding = '4px 12px';
@@ -808,10 +848,13 @@ class DiffModal extends obsidian.Modal {
                     newCell.style.wordBreak = 'break-all';
                     newCell.style.userSelect = 'text';
                     newCell.textContent = line;
-                    
+
                 } else if (group.type === 'removed') {
+                    const isFm = oldFm.next(line);
+                    if (isFm) row.addClass('version-diff-frontmatter');
+
                     row.style.backgroundColor = 'rgba(239, 68, 68, 0.1)';
-                    
+
                     const oldNumCell = row.createDiv();
                     oldNumCell.style.width = '50px';
                     oldNumCell.style.padding = '4px';
@@ -820,7 +863,7 @@ class DiffModal extends obsidian.Modal {
                     oldNumCell.style.userSelect = 'none';
                     oldNumCell.textContent = oldLineNum;
                     oldLineNum++;
-                    
+
                     const oldCell = row.createDiv();
                     oldCell.style.flex = '1';
                     oldCell.style.padding = '4px 12px';
@@ -830,7 +873,7 @@ class DiffModal extends obsidian.Modal {
                     oldCell.style.backgroundColor = 'rgba(239, 68, 68, 0.05)';
                     oldCell.style.userSelect = 'text';
                     oldCell.textContent = line;
-                    
+
                     const newNumCell = row.createDiv();
                     newNumCell.style.width = '50px';
                     newNumCell.style.padding = '4px';
@@ -838,7 +881,7 @@ class DiffModal extends obsidian.Modal {
                     newNumCell.style.color = 'var(--text-muted)';
                     newNumCell.style.userSelect = 'none';
                     newNumCell.textContent = '';
-                    
+
                     const newCell = row.createDiv();
                     newCell.style.flex = '1';
                     newCell.style.padding = '4px 12px';
@@ -846,10 +889,13 @@ class DiffModal extends obsidian.Modal {
                     newCell.style.wordBreak = 'break-all';
                     newCell.style.userSelect = 'text';
                     newCell.textContent = '';
-                    
+
                 } else if (group.type === 'added') {
+                    const isFm = newFm.next(line);
+                    if (isFm) row.addClass('version-diff-frontmatter');
+
                     row.style.backgroundColor = 'rgba(34, 197, 94, 0.1)';
-                    
+
                     const oldNumCell = row.createDiv();
                     oldNumCell.style.width = '50px';
                     oldNumCell.style.padding = '4px';
@@ -857,7 +903,7 @@ class DiffModal extends obsidian.Modal {
                     oldNumCell.style.color = 'var(--text-muted)';
                     oldNumCell.style.userSelect = 'none';
                     oldNumCell.textContent = '';
-                    
+
                     const oldCell = row.createDiv();
                     oldCell.style.flex = '1';
                     oldCell.style.padding = '4px 12px';
@@ -865,7 +911,7 @@ class DiffModal extends obsidian.Modal {
                     oldCell.style.wordBreak = 'break-all';
                     oldCell.style.userSelect = 'text';
                     oldCell.textContent = '';
-                    
+
                     const newNumCell = row.createDiv();
                     newNumCell.style.width = '50px';
                     newNumCell.style.padding = '4px';
@@ -874,7 +920,7 @@ class DiffModal extends obsidian.Modal {
                     newNumCell.style.userSelect = 'none';
                     newNumCell.textContent = newLineNum;
                     newLineNum++;
-                    
+
                     const newCell = row.createDiv();
                     newCell.style.flex = '1';
                     newCell.style.padding = '4px 12px';
@@ -888,11 +934,11 @@ class DiffModal extends obsidian.Modal {
             }
         }
     }
-    
+
     groupDiffLines(diff) {
         const groups = [];
         let currentGroup = null;
-        
+
         for (const item of diff) {
             if (currentGroup && currentGroup.type === item.type) {
                 currentGroup.value += '\n' + item.value;
@@ -901,10 +947,10 @@ class DiffModal extends obsidian.Modal {
                 groups.push(currentGroup);
             }
         }
-        
+
         return groups;
     }
-    
+
     onClose() {
         const {contentEl} = this;
         contentEl.empty();
