@@ -644,9 +644,10 @@ class DiffModal extends obsidian.Modal {
     }
 
     async onOpen() {
-        const {contentEl} = this;
+        const {contentEl, modalEl} = this;
         contentEl.empty();
 
+        this.modalEl = modalEl;
         this.diff = computeDiff(this.version1.content, this.version2.content);
         this.groups = this.groupDiffLines(this.diff);
         this.processedLines = this.processGroups(this.groups);
@@ -721,19 +722,31 @@ class DiffModal extends obsidian.Modal {
     }
 
     renderContent() {
-        const {contentEl} = this;
+        const {contentEl, modalEl} = this;
         contentEl.empty();
 
         if (this.isFullscreen) {
-            contentEl.style.position = 'fixed';
-            contentEl.style.top = '0';
-            contentEl.style.left = '0';
-            contentEl.style.right = '0';
-            contentEl.style.bottom = '0';
-            contentEl.style.zIndex = '1000';
-            contentEl.style.backgroundColor = 'var(--background-primary)';
+            modalEl.style.position = 'fixed';
+            modalEl.style.top = '0';
+            modalEl.style.left = '0';
+            modalEl.style.right = '0';
+            modalEl.style.bottom = '0';
+            modalEl.style.zIndex = '1000';
+            modalEl.style.backgroundColor = 'var(--background-primary)';
+            modalEl.style.margin = '0';
             contentEl.style.padding = '20px';
             contentEl.style.overflow = 'auto';
+        } else {
+            modalEl.style.position = '';
+            modalEl.style.top = '';
+            modalEl.style.left = '';
+            modalEl.style.right = '';
+            modalEl.style.bottom = '';
+            modalEl.style.zIndex = '';
+            modalEl.style.backgroundColor = '';
+            modalEl.style.margin = '';
+            contentEl.style.padding = '';
+            contentEl.style.overflow = '';
         }
 
         const headerEl = contentEl.createDiv({ cls: 'diff-header' });
@@ -748,7 +761,7 @@ class DiffModal extends obsidian.Modal {
             this.showOnlyDiff = diffToggle.checked;
             this.renderContent();
         });
-        diffToggleLabel.append('只显示差异');
+        diffToggleLabel.createSpan({ text: '只显示差异' });
 
         const viewBtn = controlsEl.createEl('button', {
             cls: 'diff-view-btn',
