@@ -343,6 +343,15 @@ class VersionViewPlugin extends obsidian.Plugin {
             active: true,
             state: { version1, version2 }
         });
+        const view = leaf.view;
+        if (view instanceof DiffViewPane) {
+            view.version1 = version1;
+            view.version2 = version2;
+            view.diff = computeDiff(version1.content, version2.content);
+            view.groups = view.groupDiffLines(view.diff);
+            view.processedLines = view.processGroups(view.groups);
+            view.renderContent();
+        }
     }
 }
 
@@ -660,29 +669,30 @@ class DiffViewPane extends obsidian.ItemView {
     }
 
     getViewType() { return DiffViewPane.VIEW_TYPE; }
-    getDisplayText() { return '版本对比'; }
+    getDisplayText() {
+        if (this.version1 && this.version2) {
+            return `对比: ${this.version1.name} vs ${this.version2.name}`;
+        }
+        return '版本对比';
+    }
     getIcon() { return 'file-search'; }
+
+    getState() {
+        return { version1: this.version1, version2: this.version2 };
+    }
+
+    setState(state, result) {
+        this.version1 = state.version1;
+        this.version2 = state.version2;
+        super.setState(state, result);
+    }
 
     async onOpen() {
         this.contentEl.empty();
-
-        const state = this.leaf.getViewState().state || {};
-        this.version1 = state.version1;
-        this.version2 = state.version2;
-
         if (!this.version1 || !this.version2) {
             this.contentEl.createDiv({ cls: 'version-view-placeholder', text: '请先选择两个版本进行对比' });
             return;
         }
-
-        this.diff = computeDiff(this.version1.content, this.version2.content);
-        this.groups = this.groupDiffLines(this.diff);
-        this.processedLines = this.processGroups(this.groups);
-
-        this.renderContent();
-    }
-
-    onResize() {
         this.renderContent();
     }
 
