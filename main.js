@@ -106,7 +106,54 @@ class VersionService {
         } catch (e) {
             console.error('[VersionView] Failed to read version index:', e);
         }
+        const migrated = await this._migrateOldFormat(file);
+        if (migrated) return migrated;
         return { nextId: 1, versions: [] };
+    }
+
+    async _migrateOldFormat(file) {
+        const dir = this._getVersionDir(file);
+        try {
+            if (!await this.app.vault.adapter.exists(dir)) return null;
+
+            const entries = await this.app.vault.adapter.list(dir);
+            const oldFiles = entries.files.filter(f =>
+                f.endsWith('.json') && !f.endsWith('/versions.json')
+            );
+
+            if (oldFiles.length === 0) return null;
+
+            const temp = [];
+            for (const filePath of oldFiles) {
+                try {
+                    const content = await this.app.vault.adapter.read(filePath);
+                    const data = JSON.parse(content);
+                    temp.push(data);
+                } catch (e) {
+                    console.error('[VersionView] Failed to migrate old version file:', filePath, e);
+                }
+            }
+
+            if (temp.length === 0) return null;
+
+            temp.sort((a, b) => a.timestamp - b.timestamp);
+            const versions = temp.map((v, i) => ({
+                id: i + 1,
+                name: v.name || `V${i + 1}`,
+                description: v.description || '',
+                timestamp: v.timestamp,
+                content: v.content
+            }));
+
+            const index = { nextId: versions.length + 1, versions };
+            await this._writeIndex(file, index);
+
+            new obsidian.Notice(`已迁移 ${versions.length} 个旧版本记录`);
+            return index;
+        } catch (e) {
+            console.error('[VersionView] Migration failed:', e);
+            return null;
+        }
     }
 
     async _writeIndex(file, data) {
