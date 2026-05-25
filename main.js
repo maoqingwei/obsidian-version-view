@@ -290,6 +290,10 @@ class VersionViewPlugin extends obsidian.Plugin {
             return new VersionViewPane(leaf, this);
         });
 
+        this.registerView(DiffViewPane.VIEW_TYPE, (leaf) => {
+            return new DiffViewPane(leaf, this);
+        });
+
         this.addRibbonIcon('clock', '版本视图', () => {
             this.activateView();
         });
@@ -307,6 +311,7 @@ class VersionViewPlugin extends obsidian.Plugin {
 
     onunload() {
         this.app.workspace.detachLeavesOfType(VersionViewPane.VIEW_TYPE);
+        this.app.workspace.detachLeavesOfType(DiffViewPane.VIEW_TYPE);
     }
 
     async loadSettings() {
@@ -329,6 +334,15 @@ class VersionViewPlugin extends obsidian.Plugin {
             await leaf.setViewState({ type: VersionViewPane.VIEW_TYPE, active: true });
         }
         workspace.revealLeaf(leaf);
+    }
+
+    async openDiffView(version1, version2) {
+        const leaf = this.app.workspace.getLeaf(true);
+        await leaf.setViewState({
+            type: DiffViewPane.VIEW_TYPE,
+            active: true,
+            state: { version1, version2 }
+        });
     }
 }
 
@@ -494,12 +508,12 @@ class VersionViewPane extends obsidian.ItemView {
             diffBtn.title = '与当前对比';
             diffBtn.addEventListener('click', async () => {
                 const currentContent = await this.app.vault.read(this.file);
-                new DiffModal(this.app, version, {
+                this.plugin.openDiffView(version, {
                     name: '当前文档',
                     timestamp: Date.now(),
                     content: currentContent,
                     isCurrent: true
-                }).open();
+                });
             });
 
             const restoreBtn = buttonsEl.createEl('button', { text: '↩️', cls: 'version-item-btn' });
@@ -553,7 +567,7 @@ class VersionViewPane extends obsidian.ItemView {
 
     compareSelected() {
         if (this.selectedVersions.length === 2) {
-            new DiffModal(this.app, this.selectedVersions[0], this.selectedVersions[1]).open();
+            this.plugin.openDiffView(this.selectedVersions[0], this.selectedVersions[1]);
         }
     }
 
@@ -610,7 +624,7 @@ class EditVersionModal extends obsidian.Modal {
     }
 }
 
-// ========== 差异对比模态框 ==========
+// ========== 差异对比视图 ==========
 class FrontmatterTracker {
     constructor() {
         this._inside = false;
@@ -633,23 +647,42 @@ class FrontmatterTracker {
     }
 }
 
-class DiffModal extends obsidian.Modal {
-    constructor(app, version1, version2) {
-        super(app);
-        this.version1 = version1;
-        this.version2 = version2;
+class DiffViewPane extends obsidian.ItemView {
+    static VIEW_TYPE = 'version-diff';
+
+    constructor(leaf, plugin) {
+        super(leaf);
+        this.plugin = plugin;
+        this.version1 = null;
+        this.version2 = null;
         this.showOnlyDiff = true;
         this.viewMode = 'split';
     }
 
+    getViewType() { return DiffViewPane.VIEW_TYPE; }
+    getDisplayText() { return '版本对比'; }
+    getIcon() { return 'file-search'; }
+
     async onOpen() {
-        const {contentEl} = this;
-        contentEl.empty();
+        this.contentEl.empty();
+
+        const state = this.leaf.getViewState().state || {};
+        this.version1 = state.version1;
+        this.version2 = state.version2;
+
+        if (!this.version1 || !this.version2) {
+            this.contentEl.createDiv({ cls: 'version-view-placeholder', text: '请先选择两个版本进行对比' });
+            return;
+        }
 
         this.diff = computeDiff(this.version1.content, this.version2.content);
         this.groups = this.groupDiffLines(this.diff);
         this.processedLines = this.processGroups(this.groups);
 
+        this.renderContent();
+    }
+
+    onResize() {
         this.renderContent();
     }
 
@@ -745,9 +778,6 @@ class DiffModal extends obsidian.Modal {
             this.viewMode = this.viewMode === 'split' ? 'unified' : 'split';
             this.renderContent();
         });
-
-        const closeBtn = controlsEl.createEl('button', { cls: 'diff-close-btn', text: '✕' });
-        closeBtn.addEventListener('click', () => this.close());
 
         const container = contentEl.createDiv({ cls: 'diff-container' });
 
@@ -907,8 +937,7 @@ class DiffModal extends obsidian.Modal {
     }
 
     onClose() {
-        const {contentEl} = this;
-        contentEl.empty();
+        this.contentEl.empty();
     }
 }
 
