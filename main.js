@@ -544,7 +544,7 @@ class VersionViewPane extends obsidian.ItemView {
 
     updateCompareBtn() {
         if (this.selectedVersions.length === 2) {
-            this.compareBtn.style.display = '';
+            this.compareBtn.style.display = 'block';
             this.compareBtn.textContent = `🔍 对比: ${this.selectedVersions[0].name} vs ${this.selectedVersions[1].name}`;
         } else {
             this.compareBtn.style.display = 'none';
@@ -639,15 +639,13 @@ class DiffModal extends obsidian.Modal {
         this.version1 = version1;
         this.version2 = version2;
         this.showOnlyDiff = true;
-        this.isFullscreen = true;
         this.viewMode = 'split';
     }
 
     async onOpen() {
-        const {contentEl, modalEl} = this;
+        const {contentEl} = this;
         contentEl.empty();
 
-        this.modalEl = modalEl;
         this.diff = computeDiff(this.version1.content, this.version2.content);
         this.groups = this.groupDiffLines(this.diff);
         this.processedLines = this.processGroups(this.groups);
@@ -722,32 +720,8 @@ class DiffModal extends obsidian.Modal {
     }
 
     renderContent() {
-        const {contentEl, modalEl} = this;
+        const {contentEl} = this;
         contentEl.empty();
-
-        if (this.isFullscreen) {
-            modalEl.style.position = 'fixed';
-            modalEl.style.top = '0';
-            modalEl.style.left = '0';
-            modalEl.style.right = '0';
-            modalEl.style.bottom = '0';
-            modalEl.style.zIndex = '1000';
-            modalEl.style.backgroundColor = 'var(--background-primary)';
-            modalEl.style.margin = '0';
-            contentEl.style.padding = '20px';
-            contentEl.style.overflow = 'auto';
-        } else {
-            modalEl.style.position = '';
-            modalEl.style.top = '';
-            modalEl.style.left = '';
-            modalEl.style.right = '';
-            modalEl.style.bottom = '';
-            modalEl.style.zIndex = '';
-            modalEl.style.backgroundColor = '';
-            modalEl.style.margin = '';
-            contentEl.style.padding = '';
-            contentEl.style.overflow = '';
-        }
 
         const headerEl = contentEl.createDiv({ cls: 'diff-header' });
         headerEl.createEl('h2', { text: `版本对比: ${this.version1.name} vs ${this.version2.name}` });
@@ -769,12 +743,6 @@ class DiffModal extends obsidian.Modal {
         });
         viewBtn.addEventListener('click', () => {
             this.viewMode = this.viewMode === 'split' ? 'unified' : 'split';
-            this.renderContent();
-        });
-
-        const fullscreenBtn = controlsEl.createEl('button', { cls: 'diff-view-btn', text: this.isFullscreen ? '退出全屏' : '全屏' });
-        fullscreenBtn.addEventListener('click', () => {
-            this.isFullscreen = !this.isFullscreen;
             this.renderContent();
         });
 
