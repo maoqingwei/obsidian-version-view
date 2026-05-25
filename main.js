@@ -378,47 +378,21 @@ class VersionViewModal extends obsidian.Modal {
         }
 
         for (const version of this.versions) {
-            const itemEl = this.versionListEl.createDiv();
-            itemEl.style.padding = '12px';
-            itemEl.style.borderBottom = '1px solid var(--background-modifier-border)';
-            itemEl.style.display = 'flex';
-            itemEl.style.justifyContent = 'space-between';
-            itemEl.style.alignItems = 'center';
+            const card = this.versionListEl.createDiv({ cls: 'version-item-card' });
 
-            const leftEl = itemEl.createDiv();
-            leftEl.style.display = 'flex';
-            leftEl.style.alignItems = 'center';
-            leftEl.style.gap = '10px';
-            leftEl.style.flex = '1';
-            leftEl.style.minWidth = '0';
+            const row1 = card.createDiv({ cls: 'version-item-row1' });
 
-            const checkbox = leftEl.createEl('input', {type: 'checkbox'});
-            checkbox.style.width = '18px';
-            checkbox.style.height = '18px';
-            checkbox.style.cursor = 'pointer';
-            checkbox.style.flexShrink = '0';
+            const checkbox = row1.createEl('input', {type: 'checkbox', cls: 'version-item-checkbox'});
 
-            const infoEl = leftEl.createDiv();
-            infoEl.style.minWidth = '0';
-            const dateStr = new Date(version.timestamp).toLocaleString();
-            infoEl.createEl('div', {text: version.name, cls: 'version-view-name'});
-            if (version.description) {
-                const descEl = infoEl.createEl('div', {text: version.description, cls: 'version-view-description'});
-                descEl.title = version.description;
-            }
-            infoEl.createEl('small', {text: dateStr, style: 'color: var(--text-muted);'});
+            const tag = row1.createDiv({ cls: 'version-item-tag' });
+            tag.setText(`V${version.id}`);
 
-            const buttonsEl = itemEl.createDiv();
-            buttonsEl.style.display = 'flex';
-            buttonsEl.style.gap = '6px';
-            buttonsEl.style.flexShrink = '0';
+            const nameEl = row1.createDiv({ cls: 'version-item-name' });
+            nameEl.setText(version.name);
 
-            const editBtn = buttonsEl.createEl('button', {text: '✏️'});
-            editBtn.style.padding = '4px 6px';
-            editBtn.style.cursor = 'pointer';
-            editBtn.style.borderRadius = '4px';
-            editBtn.style.border = '1px solid var(--background-modifier-border)';
-            editBtn.style.backgroundColor = 'var(--background-secondary)';
+            const buttonsEl = row1.createDiv({ cls: 'version-item-actions' });
+
+            const editBtn = buttonsEl.createEl('button', {text: '✏️', cls: 'version-item-btn'});
             editBtn.title = '编辑';
             editBtn.addEventListener('click', () => {
                 new EditVersionModal(this.app, version, {
@@ -427,12 +401,7 @@ class VersionViewModal extends obsidian.Modal {
                 }).open();
             });
 
-            const diffCurrentBtn = buttonsEl.createEl('button', {text: '🔍'});
-            diffCurrentBtn.style.padding = '4px 6px';
-            diffCurrentBtn.style.cursor = 'pointer';
-            diffCurrentBtn.style.borderRadius = '4px';
-            diffCurrentBtn.style.border = '1px solid var(--background-modifier-border)';
-            diffCurrentBtn.style.backgroundColor = 'var(--background-secondary)';
+            const diffCurrentBtn = buttonsEl.createEl('button', {text: '🔍', cls: 'version-item-btn'});
             diffCurrentBtn.title = '与当前对比';
             diffCurrentBtn.addEventListener('click', async () => {
                 const currentContent = await this.app.vault.read(this.file);
@@ -442,16 +411,10 @@ class VersionViewModal extends obsidian.Modal {
                     content: currentContent,
                     isCurrent: true
                 };
-                const diffModal = new DiffModal(this.app, version, currentVersion);
-                diffModal.open();
+                new DiffModal(this.app, version, currentVersion).open();
             });
 
-            const restoreBtn = buttonsEl.createEl('button', {text: '↩️'});
-            restoreBtn.style.padding = '4px 6px';
-            restoreBtn.style.cursor = 'pointer';
-            restoreBtn.style.borderRadius = '4px';
-            restoreBtn.style.border = '1px solid var(--background-modifier-border)';
-            restoreBtn.style.backgroundColor = 'var(--background-secondary)';
+            const restoreBtn = buttonsEl.createEl('button', {text: '↩️', cls: 'version-item-btn'});
             restoreBtn.title = '恢复';
             restoreBtn.addEventListener('click', async () => {
                 if (confirm(`确定要恢复到版本 "${version.name}" 吗？`)) {
@@ -460,12 +423,7 @@ class VersionViewModal extends obsidian.Modal {
                 }
             });
 
-            const deleteBtn = buttonsEl.createEl('button', {text: '🗑️'});
-            deleteBtn.style.padding = '4px 6px';
-            deleteBtn.style.cursor = 'pointer';
-            deleteBtn.style.borderRadius = '4px';
-            deleteBtn.style.border = '1px solid var(--background-modifier-border)';
-            deleteBtn.style.backgroundColor = 'var(--background-secondary)';
+            const deleteBtn = buttonsEl.createEl('button', {text: '🗑️', cls: 'version-item-btn'});
             deleteBtn.title = '删除';
             deleteBtn.addEventListener('click', async () => {
                 if (confirm(`确定要删除版本 "${version.name}" 吗？`)) {
@@ -473,6 +431,14 @@ class VersionViewModal extends obsidian.Modal {
                     await this.loadVersions();
                 }
             });
+
+            if (version.description) {
+                const descEl = card.createDiv({ cls: 'version-item-desc' });
+                descEl.setText(version.description);
+            }
+
+            const timeEl = card.createDiv({ cls: 'version-item-time' });
+            timeEl.setText(new Date(version.timestamp).toLocaleString());
 
             this.checkboxes.push({ el: checkbox, version: version });
 
