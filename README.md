@@ -13,6 +13,7 @@ A simple version control plugin for Obsidian. Save, manage, compare and restore 
 - **Compare Any Two Versions** - Select two versions to compare, or compare with current document
 - **Fullscreen Diff View** - Toggle fullscreen mode for better readability
 - **Show Only Differences** - Filter to show only changed lines
+- **Frontmatter-Aware Diff** - YAML frontmatter is visually distinguished for cleaner comparison
 - **Configurable Settings** - Set version storage folder and maximum version count
 
 ## Installation
