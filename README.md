@@ -18,13 +18,18 @@ A simple version control plugin for Obsidian. Save, manage, compare and restore 
 
 ## Installation
 
+### Community Plugin Store (Recommended)
+
+1. Open **Settings → Community plugins**
+2. Click **Browse** and search for "Version View"
+3. Click **Install**, then **Enable**
+
 ### Manual Installation
 
 1. Download `main.js`, `styles.css`, and `manifest.json` from the [latest release](https://github.com/maoqingwei/obsidian-version-view/releases)
 2. Create a folder `version-view` in your vault's `.obsidian/plugins/` directory
 3. Copy the downloaded files into the `version-view` folder
-4. Restart Obsidian
-5. Enable the plugin in Settings → Community plugins
+4. Enable the plugin in Settings → Community plugins
 
 ### BRAT Installation
 

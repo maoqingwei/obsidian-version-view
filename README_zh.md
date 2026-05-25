@@ -18,7 +18,13 @@
 
 ## 安装方法
 
-### 方式一：手动安装（推荐）
+### 方式一：社区商店安装（推荐）
+
+1. 打开 **设置 → 社区插件**
+2. 点击 **浏览**，搜索 "Version View"
+3. 点击 **安装**，然后 **启用**
+
+### 方式二：手动安装
 
 1. 从 [Releases](https://github.com/maoqingwei/obsidian-version-view/releases) 下载以下文件：
    - `main.js`
@@ -37,10 +43,9 @@
 ```
 
 3. 将下载的文件复制到 `version-view` 文件夹中
-4. 重启 Obsidian
-5. 进入 **设置 → 社区插件**，找到 "Version View" 并启用
+4. 进入 **设置 → 社区插件**，找到 "Version View" 并启用
 
-### 方式二：BRAT 安装
+### 方式三：BRAT 安装
 
 1. 安装 [BRAT](https://github.com/TfTHacker/obsidian42-brat) 插件
 2. 添加仓库地址：`https://github.com/maoqingwei/obsidian-version-view`
