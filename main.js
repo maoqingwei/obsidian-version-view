@@ -446,7 +446,7 @@ class VersionViewPane extends obsidian.ItemView {
         this.listEl = contentEl.createDiv({ cls: 'version-view-list' });
 
         this.emptyEl = contentEl.createDiv({ cls: 'version-view-placeholder' });
-        this.emptyEl.setText('暂无版本');
+        this.emptyEl.style.display = 'none';
     }
 
     async refresh() {
@@ -483,8 +483,14 @@ class VersionViewPane extends obsidian.ItemView {
     }
 
     async loadVersions() {
-        this.listEl.empty();
+        this._loadGen = (this._loadGen || 0) + 1;
+        const gen = this._loadGen;
+
         this.versions = await this.plugin.versionService.getVersions(this.file);
+
+        if (gen !== this._loadGen) return;
+
+        this.listEl.empty();
         this.selectedVersions = [];
         this.compareBtn.style.display = 'none';
 
