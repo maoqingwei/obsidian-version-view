@@ -39,8 +39,8 @@ A simple version control plugin for Obsidian. Save, manage, compare and restore 
 ## Usage
 
 1. Open any note
-2. Click the clock icon 🕐 in the ribbon, or run the command "切换版本视图"
-3. Enter a version name (optional) and click "保存此版本"
+2. Click the clock icon 🕐 in the ribbon, or run the command "Toggle Version View"
+3. Enter a version name (optional) and click "Save"
 4. Use the action buttons for each version:
    - ✏️ Edit version name and description
    - 🔍 Compare with current document
