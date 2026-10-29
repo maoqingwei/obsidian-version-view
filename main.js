@@ -1,5 +1,112 @@
 const obsidian = require('obsidian');
 
+// Keep translations in this file so manual installation still needs only three files.
+const ENGLISH = {
+    "保存版本": "Save version",
+    "保存中…": "Saving…",
+    "未选择笔记": "No note selected",
+    "恢复前备份 {value0}": "Before restore {value0}",
+    "自动保存：恢复前的笔记内容": "Automatically saved before restoring a version",
+    "恢复已取消：未能保存当前内容的备份": "Restore cancelled: could not back up the current content",
+    "当前内容已与此版本相同": "The current content already matches this version",
+    "已恢复，并保存了恢复前备份。可在侧栏撤销。": "Restored and backed up the previous content. Undo is available in the sidebar.",
+    "已保存恢复前备份，可撤销本次恢复": "The previous content is backed up. You can undo this restore.",
+    "撤销恢复": "Undo restore",
+    "撤销中…": "Undoing…",
+    "已撤销恢复": "Restore undone",
+    "恢复后内容已有修改，未执行撤销。请从恢复前备份对比并恢复。": "The note has changed since restoring. Compare with the backup to recover your previous content.",
+    "撤销失败: {value0}": "Failed to undo restore: {value0}",
+    "恢复 \"{value0}\" 将覆盖当前笔记。继续前会自动保存当前内容的备份。": "Restoring \"{value0}\" will replace this note. Its current content will be backed up first.",
+    "旧版本 → 新版本": "Older → Newer",
+    "旧版本 · {value0} · {value1}": "Older · {value0} · {value1}",
+    "新版本 · {value0} · {value1}": "Newer · {value0} · {value1}",
+    "🔍 对比: {value0} → {value1}": "🔍 Compare: {value0} → {value1}",
+    "对比: {value0} → {value1}": "Compare: {value0} → {value1}",
+    "版本对比: {value0} → {value1}": "Compare: {value0} → {value1}",
+
+    "切换版本视图": "Toggle Version View",
+    "已迁移 {value0} 个旧版本记录": "Migrated {value0} old version files",
+    "版本 \"{value0}\" 已保存": "Version \"{value0}\" saved",
+    "保存版本失败:": "Failed to save version:",
+    "保存版本失败: {value0}": "Failed to save version: {value0}",
+    "版本不存在": "Version not found",
+    "版本信息已更新": "Version information updated",
+    "更新版本失败: {value0}": "Failed to update version: {value0}",
+    "已恢复到版本 \"{value0}\"": "Restored to version \"{value0}\"",
+    "恢复版本失败: {value0}": "Failed to restore version: {value0}",
+    "版本已删除": "Version deleted",
+    "删除版本失败: {value0}": "Failed to delete version: {value0}",
+    "版本视图": "Version View",
+    "版本存储文件夹": "Version Storage Folder",
+    "版本文件保存的相对路径": "Location where version history is saved",
+    "最大版本数量": "Maximum Version Count",
+    "超出后自动删除旧版本": "Old versions above this limit will be automatically deleted.",
+    "版本名称（可选）": "Version Name (Optional)",
+    "保存": "Save",
+    "🔍 对比选中版本": "🔍 Compare Selected Versions",
+    "请先打开一个笔记": "Please open a note first",
+    "保存失败: {value0}": "Save failed: {value0}",
+    "暂无版本": "No versions available",
+    "编辑": "Edit Version Info",
+    "与当前对比": "Compare with Current Version",
+    "当前文档": "Current Note",
+    "恢复": "Restore this version",
+    "确定要恢复到版本 \"{value0}\" 吗？": "Are you sure you want to restore \"{value0}\"?",
+    "删除": "Delete Version",
+    "确定要删除版本 \"{value0}\" 吗？": "Are you sure you want to delete \"{value0}\"?",
+    "最多只能选择 2 个版本进行对比": "You can select at most two versions for comparison",
+    "🔍 对比: {value0} vs {value1}": "🔍 Compare: {value0} vs {value1}",
+    "编辑版本": "Edit Version Information",
+    "版本名称": "Version Name",
+    "版本描述": "Version Description",
+    "取消": "Cancel",
+    "版本名称不能为空": "Version name cannot be empty",
+    "对比: {value0} vs {value1}": "Compare: {value0} vs {value1}",
+    "版本对比": "Version Compare",
+    "请先选择两个版本进行对比": "Please select two versions to compare",
+    "版本对比: {value0} vs {value1}": "Compare: {value0} vs {value1}",
+    "只显示差异": "Show Only Differences",
+    "统一视图": "Unified View",
+    "拆分视图": "Split View",
+    "两个版本完全相同": "The two versions are identical",
+    "行号": "Line"
+};
+
+function getInterfaceLanguage() {
+    try {
+        // getLanguage is the public API; the stored setting supports older Obsidian versions.
+        const language = typeof obsidian.getLanguage === 'function'
+            ? obsidian.getLanguage()
+            : (typeof localStorage !== 'undefined' ? localStorage.getItem('language') : 'en');
+        return /^zh(?:[-_]|$)/i.test(language || '') ? 'zh' : 'en';
+    } catch (_) {
+        return 'en';
+    }
+}
+
+function t(key, values = {}) {
+    const text = getInterfaceLanguage() === 'zh' ? key : (ENGLISH[key] || key);
+    return text.replace(/\{(\w+)\}/g, (match, name) =>
+        Object.prototype.hasOwnProperty.call(values, name) ? String(values[name]) : match);
+}
+
+function orderVersions(first, second) {
+    // The live note is always the destination, even if the system clock has changed.
+    if (first.isCurrent !== second.isCurrent && (first.isCurrent || second.isCurrent)) {
+        return first.isCurrent ? [second, first] : [first, second];
+    }
+    return first.timestamp > second.timestamp ||
+        (first.timestamp === second.timestamp && first.id > second.id)
+        ? [second, first] : [first, second];
+}
+
+function versionHeading(version, older) {
+    return t(older ? "旧版本 · {value0} · {value1}" : "新版本 · {value0} · {value1}", {
+        value0: version.name,
+        value1: new Date(version.timestamp).toLocaleString()
+    });
+}
+
 function escapeHtml(text) {
     return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
 }
@@ -130,6 +237,58 @@ class VersionService {
     constructor(app, settings) {
         this.app = app;
         this.settings = settings;
+        this.pendingWrites = new Map();
+        this.restoreUndo = new Map();
+    }
+
+    // Serialize writes per note so a backup cannot overwrite a concurrent save.
+    _runForFile(file, action) {
+        const previous = this.pendingWrites.get(file) || Promise.resolve();
+        const next = previous.catch(() => {}).then(action);
+        this.pendingWrites.set(file, next);
+        const cleanup = () => {
+            if (this.pendingWrites.get(file) === next) this.pendingWrites.delete(file);
+        };
+        next.then(cleanup, cleanup);
+        return next;
+    }
+
+    saveVersion(file, content, name, description) {
+        return this._runForFile(file, () => this._saveVersion(file, content, name, description));
+    }
+
+    updateVersion(file, versionId, name, description) {
+        return this._runForFile(file, () => this._updateVersion(file, versionId, name, description));
+    }
+
+    deleteVersion(file, versionId) {
+        return this._runForFile(file, () => this._deleteVersion(file, versionId));
+    }
+
+    restoreVersion(version, file) {
+        return this._runForFile(file, () => this._restoreVersion(version, file));
+    }
+
+    canUndoRestore(file) { return this.restoreUndo.has(file); }
+
+    undoRestore(file) {
+        return this._runForFile(file, async () => {
+            const undo = this.restoreUndo.get(file);
+            if (!undo) return false;
+            try {
+                if (await this.app.vault.read(file) !== undo.restored) {
+                    new obsidian.Notice(t("恢复后内容已有修改，未执行撤销。请从恢复前备份对比并恢复。"));
+                    return false;
+                }
+                await this.app.vault.modify(file, undo.before);
+                this.restoreUndo.delete(file);
+                new obsidian.Notice(t("已撤销恢复"));
+                return true;
+            } catch (error) {
+                new obsidian.Notice(t("撤销失败: {value0}", { value0: error.message }));
+                return false;
+            }
+        });
     }
 
     _getVersionDir(file) {
@@ -193,7 +352,7 @@ class VersionService {
 
             const index = { nextId: versions.length + 1, versions };
             await this._writeIndex(file, index);
-            new obsidian.Notice(`已迁移 ${versions.length} 个旧版本记录`);
+            new obsidian.Notice(t("已迁移 {value0} 个旧版本记录", { value0: versions.length }));
             return index;
         } catch (e) {
             console.error('[VersionView] Migration failed:', e);
@@ -205,7 +364,7 @@ class VersionService {
         await this.app.vault.adapter.write(this._getIndexPath(file), JSON.stringify(data, null, 2));
     }
 
-    async saveVersion(file, content, name, description) {
+    async _saveVersion(file, content, name, description, silent = false) {
         try {
             await this._ensureDir(this.settings.versionFolder);
             await this._ensureDir(this._getVersionDir(file));
@@ -221,30 +380,30 @@ class VersionService {
             index.versions.unshift(version);
             await this._writeIndex(file, index);
 
-            new obsidian.Notice(`版本 "${name}" 已保存`);
+            if (!silent) new obsidian.Notice(t("版本 \"{value0}\" 已保存", { value0: name }));
             return true;
         } catch (error) {
-            console.error('保存版本失败:', error);
-            new obsidian.Notice(`保存版本失败: ${error.message}`);
+            console.error(t("保存版本失败:"), error);
+            new obsidian.Notice(t("保存版本失败: {value0}", { value0: error.message }));
             return false;
         }
     }
 
-    async updateVersion(file, versionId, newName, newDescription) {
+    async _updateVersion(file, versionId, newName, newDescription) {
         try {
             const index = await this._readIndex(file);
             const version = index.versions.find(v => v.id === versionId);
             if (!version) {
-                new obsidian.Notice('版本不存在');
+                new obsidian.Notice(t("版本不存在"));
                 return false;
             }
             version.name = newName;
             version.description = newDescription;
             await this._writeIndex(file, index);
-            new obsidian.Notice('版本信息已更新');
+            new obsidian.Notice(t("版本信息已更新"));
             return true;
         } catch (error) {
-            new obsidian.Notice(`更新版本失败: ${error.message}`);
+            new obsidian.Notice(t("更新版本失败: {value0}", { value0: error.message }));
             return false;
         }
     }
@@ -254,26 +413,39 @@ class VersionService {
         return index.versions.sort((a, b) => b.timestamp - a.timestamp);
     }
 
-    async restoreVersion(versionMeta, file) {
+    async _restoreVersion(versionMeta, file) {
         try {
+            const before = await this.app.vault.read(file);
+            if (before === versionMeta.content) {
+                new obsidian.Notice(t("当前内容已与此版本相同"));
+                return false;
+            }
+            const saved = await this._saveVersion(file, before,
+                t("恢复前备份 {value0}", { value0: new Date().toLocaleString() }),
+                t("自动保存：恢复前的笔记内容"), true);
+            if (!saved) {
+                new obsidian.Notice(t("恢复已取消：未能保存当前内容的备份"));
+                return false;
+            }
             await this.app.vault.modify(file, versionMeta.content);
-            new obsidian.Notice(`已恢复到版本 "${versionMeta.name}"`);
+            this.restoreUndo.set(file, { before, restored: versionMeta.content });
+            new obsidian.Notice(t("已恢复，并保存了恢复前备份。可在侧栏撤销。"));
             return true;
         } catch (error) {
-            new obsidian.Notice(`恢复版本失败: ${error.message}`);
+            new obsidian.Notice(t("恢复版本失败: {value0}", { value0: error.message }));
             return false;
         }
     }
 
-    async deleteVersion(file, versionId) {
+    async _deleteVersion(file, versionId) {
         try {
             const index = await this._readIndex(file);
             index.versions = index.versions.filter(v => v.id !== versionId);
             await this._writeIndex(file, index);
-            new obsidian.Notice('版本已删除');
+            new obsidian.Notice(t("版本已删除"));
             return true;
         } catch (error) {
-            new obsidian.Notice(`删除版本失败: ${error.message}`);
+            new obsidian.Notice(t("删除版本失败: {value0}", { value0: error.message }));
             return false;
         }
     }
@@ -294,13 +466,13 @@ class VersionViewPlugin extends obsidian.Plugin {
             return new DiffViewPane(leaf, this);
         });
 
-        this.addRibbonIcon('clock', '版本视图', () => {
+        this.addRibbonIcon('clock', t("版本视图"), () => {
             this.activateView();
         });
 
         this.addCommand({
             id: 'toggle-version-view',
-            name: '切换版本视图',
+            name: t("切换版本视图"),
             callback: () => {
                 this.activateView();
             }
@@ -337,6 +509,7 @@ class VersionViewPlugin extends obsidian.Plugin {
     }
 
     async openDiffView(version1, version2) {
+        [version1, version2] = orderVersions(version1, version2);
         const leaf = this.app.workspace.getLeaf(true);
         await leaf.setViewState({
             type: DiffViewPane.VIEW_TYPE,
@@ -367,8 +540,8 @@ class VersionViewSettingTab extends obsidian.PluginSettingTab {
         containerEl.empty();
 
         new obsidian.Setting(containerEl)
-            .setName('版本存储文件夹')
-            .setDesc('版本文件保存的相对路径')
+            .setName(t("版本存储文件夹"))
+            .setDesc(t("版本文件保存的相对路径"))
             .addText(text => text
                 .setPlaceholder('.res/versions')
                 .setValue(this.plugin.settings.versionFolder)
@@ -378,8 +551,8 @@ class VersionViewSettingTab extends obsidian.PluginSettingTab {
                 }));
 
         new obsidian.Setting(containerEl)
-            .setName('最大版本数量')
-            .setDesc('超出后自动删除旧版本')
+            .setName(t("最大版本数量"))
+            .setDesc(t("超出后自动删除旧版本"))
             .addSlider(slider => slider
                 .setLimits(1, 100, 1)
                 .setValue(this.plugin.settings.maxVersions)
@@ -404,7 +577,7 @@ class VersionViewPane extends obsidian.ItemView {
     }
 
     getViewType() { return VersionViewPane.VIEW_TYPE; }
-    getDisplayText() { return '版本视图'; }
+    getDisplayText() { return t("版本视图"); }
     getIcon() { return 'clock'; }
 
     async onOpen() {
@@ -424,21 +597,29 @@ class VersionViewPane extends obsidian.ItemView {
         contentEl.addClass('version-view-container');
 
         const headerEl = contentEl.createDiv({ cls: 'version-view-header' });
-        headerEl.createSpan({ cls: 'version-view-title', text: '版本视图' });
+        headerEl.createSpan({ cls: 'version-view-title', text: t("版本视图") });
+        this.fileLabel = headerEl.createDiv({ cls: 'version-view-file', text: t("未选择笔记") });
 
         const inputContainer = contentEl.createDiv({ cls: 'version-view-input-container' });
         this.nameInput = inputContainer.createEl('input', {
             type: 'text',
             cls: 'version-view-name-input',
-            attr: { placeholder: '版本名称（可选）' }
+            attr: { placeholder: t("版本名称（可选）") }
         });
 
-        const saveBtn = inputContainer.createEl('button', { cls: 'version-view-save-btn', text: '保存' });
-        saveBtn.addEventListener('click', () => this.saveCurrentVersion());
+        this.saveBtn = inputContainer.createEl('button', { cls: 'version-view-save-btn', text: t("保存版本") });
+        this.saveBtn.addEventListener('click', () => this.saveCurrentVersion());
+        this.updateSaveState();
+
+        this.undoContainer = contentEl.createDiv({ cls: 'version-view-undo' });
+        this.undoContainer.style.display = 'none';
+        this.undoContainer.createSpan({ text: t("已保存恢复前备份，可撤销本次恢复") });
+        this.undoBtn = this.undoContainer.createEl('button', { text: t("撤销恢复") });
+        this.undoBtn.addEventListener('click', () => this.undoLastRestore());
 
         this.compareBtn = contentEl.createEl('button', {
             cls: 'version-view-compare-btn',
-            text: '🔍 对比选中版本'
+            text: t("🔍 对比选中版本")
         });
         this.compareBtn.style.display = 'none';
         this.compareBtn.addEventListener('click', () => this.compareSelected());
@@ -449,13 +630,55 @@ class VersionViewPane extends obsidian.ItemView {
         this.emptyEl.style.display = 'none';
     }
 
+    updateSaveState() {
+        this.saveBtn.disabled = !this.file || !!this.isSaving;
+        this.nameInput.disabled = !this.file || !!this.isSaving;
+        this.saveBtn.setText(t(this.isSaving ? "保存中…" : "保存版本"));
+        this.saveBtn.setAttribute('aria-busy', String(!!this.isSaving));
+    }
+
+    updateUndoState() {
+        this.undoContainer.style.display = this.file &&
+            this.plugin.versionService.canUndoRestore(this.file) ? '' : 'none';
+    }
+
+    async undoLastRestore() {
+        const file = this.file;
+        if (!file || this.isUndoing) return;
+        this.isUndoing = true;
+        this.undoBtn.disabled = true;
+        this.undoBtn.setText(t("撤销中…"));
+        try {
+            await this.plugin.versionService.undoRestore(file);
+            if (this.file === file) await this.loadVersions();
+        } finally {
+            this.isUndoing = false;
+            this.undoBtn.disabled = false;
+            this.undoBtn.setText(t("撤销恢复"));
+            this.updateUndoState();
+        }
+    }
+
     async refresh() {
+        const previous = this.file;
         this.file = this.app.workspace.getActiveFile();
+        if (this.file !== previous) {
+            this._loadGen = (this._loadGen || 0) + 1;
+            this.versions = [];
+            this.selectedVersions = [];
+            this.listEl.empty();
+            this.compareBtn.style.display = 'none';
+            this.nameInput.value = '';
+        }
+        this.fileLabel.setText(this.file ? this.file.basename || this.file.name : t("未选择笔记"));
+        this.fileLabel.title = this.file ? this.file.path : '';
+        this.updateSaveState();
+        this.updateUndoState();
         if (!this.file) {
             this.listEl.empty();
             this.listEl.style.display = 'none';
             this.emptyEl.style.display = 'block';
-            this.emptyEl.setText('请先打开一个笔记');
+            this.emptyEl.setText(t("请先打开一个笔记"));
             this.compareBtn.style.display = 'none';
             return;
         }
@@ -466,19 +689,22 @@ class VersionViewPane extends obsidian.ItemView {
 
     async saveCurrentVersion() {
         const file = this.file;
-        if (!file) return;
-
+        if (!file || this.isSaving) return;
+        const name = this.nameInput.value.trim() || `V${this.versions.length + 1}`;
+        this.isSaving = true;
+        this.updateSaveState();
         try {
-            const name = this.nameInput.value.trim() || `V${this.versions.length + 1}`;
             const content = await this.app.vault.read(file);
-            const vs = this.plugin.versionService;
-            const success = await vs.saveVersion(file, content, name, '');
-            if (success) {
+            const success = await this.plugin.versionService.saveVersion(file, content, name, '');
+            if (success && this.file === file) {
                 await this.loadVersions();
-                this.nameInput.value = '';
+                if (this.file === file) this.nameInput.value = '';
             }
         } catch (error) {
-            new obsidian.Notice(`保存失败: ${error.message}`);
+            new obsidian.Notice(t("保存失败: {value0}", { value0: error.message }));
+        } finally {
+            this.isSaving = false;
+            this.updateSaveState();
         }
     }
 
@@ -486,16 +712,19 @@ class VersionViewPane extends obsidian.ItemView {
         this._loadGen = (this._loadGen || 0) + 1;
         const gen = this._loadGen;
 
-        this.versions = await this.plugin.versionService.getVersions(this.file);
-
-        if (gen !== this._loadGen) return;
+        const file = this.file;
+        if (!file) return;
+        const versions = await this.plugin.versionService.getVersions(file);
+        if (gen !== this._loadGen || file !== this.file) return;
+        this.versions = versions;
+        this.updateUndoState();
 
         this.listEl.empty();
         this.selectedVersions = [];
         this.compareBtn.style.display = 'none';
 
         if (this.versions.length === 0) {
-            this.listEl.createEl('p', { text: '暂无版本' });
+            this.listEl.createEl('p', { text: t("暂无版本") });
             return;
         }
 
@@ -511,20 +740,20 @@ class VersionViewPane extends obsidian.ItemView {
             const buttonsEl = row1.createDiv({ cls: 'version-item-actions' });
 
             const editBtn = buttonsEl.createEl('button', { text: '✏️', cls: 'version-item-btn' });
-            editBtn.title = '编辑';
+            editBtn.title = t("编辑");
             editBtn.addEventListener('click', () => {
                 new EditVersionModal(this.app, version, {
-                    update: (v, name, desc) => this.plugin.versionService.updateVersion(this.file, v.id, name, desc),
-                    onDone: () => this.loadVersions()
+                    update: (v, name, desc) => this.plugin.versionService.updateVersion(file, v.id, name, desc),
+                    onDone: () => this.file === file && this.loadVersions()
                 }).open();
             });
 
             const diffBtn = buttonsEl.createEl('button', { text: '🔍', cls: 'version-item-btn' });
-            diffBtn.title = '与当前对比';
+            diffBtn.title = t("与当前对比");
             diffBtn.addEventListener('click', async () => {
-                const currentContent = await this.app.vault.read(this.file);
+                const currentContent = await this.app.vault.read(file);
                 this.plugin.openDiffView(version, {
-                    name: '当前文档',
+                    name: t("当前文档"),
                     timestamp: Date.now(),
                     content: currentContent,
                     isCurrent: true
@@ -532,19 +761,27 @@ class VersionViewPane extends obsidian.ItemView {
             });
 
             const restoreBtn = buttonsEl.createEl('button', { text: '↩️', cls: 'version-item-btn' });
-            restoreBtn.title = '恢复';
+            restoreBtn.title = t("恢复");
             restoreBtn.addEventListener('click', async () => {
-                if (confirm(`确定要恢复到版本 "${version.name}" 吗？`)) {
-                    await this.plugin.versionService.restoreVersion(version, this.file);
+                if (this.isRestoring) return;
+                if (!confirm(t('恢复 "{value0}" 将覆盖当前笔记。继续前会自动保存当前内容的备份。', { value0: version.name }))) return;
+                this.isRestoring = true;
+                restoreBtn.disabled = true;
+                try {
+                    await this.plugin.versionService.restoreVersion(version, file);
+                    if (this.file === file) await this.loadVersions();
+                } finally {
+                    this.isRestoring = false;
+                    restoreBtn.disabled = false;
                 }
             });
 
             const deleteBtn = buttonsEl.createEl('button', { text: '🗑️', cls: 'version-item-btn' });
-            deleteBtn.title = '删除';
+            deleteBtn.title = t("删除");
             deleteBtn.addEventListener('click', async () => {
-                if (confirm(`确定要删除版本 "${version.name}" 吗？`)) {
-                    await this.plugin.versionService.deleteVersion(this.file, version.id);
-                    await this.loadVersions();
+                if (confirm(t("确定要删除版本 \"{value0}\" 吗？", { value0: version.name }))) {
+                    await this.plugin.versionService.deleteVersion(file, version.id);
+                    if (this.file === file) await this.loadVersions();
                 }
             });
 
@@ -557,12 +794,12 @@ class VersionViewPane extends obsidian.ItemView {
                 if (checkbox.checked) {
                     if (this.selectedVersions.length >= 2) {
                         checkbox.checked = false;
-                        new obsidian.Notice('最多只能选择 2 个版本进行对比');
+                        new obsidian.Notice(t("最多只能选择 2 个版本进行对比"));
                         return;
                     }
                     this.selectedVersions.push(version);
                 } else {
-                    this.selectedVersions = this.selectedVersions.filter(v => v.timestamp !== version.timestamp);
+                    this.selectedVersions = this.selectedVersions.filter(v => v.id !== version.id);
                 }
                 this.updateCompareBtn();
             });
@@ -574,7 +811,8 @@ class VersionViewPane extends obsidian.ItemView {
     updateCompareBtn() {
         if (this.selectedVersions.length === 2) {
             this.compareBtn.style.display = 'block';
-            this.compareBtn.textContent = `🔍 对比: ${this.selectedVersions[0].name} vs ${this.selectedVersions[1].name}`;
+            const [older, newer] = orderVersions(...this.selectedVersions);
+            this.compareBtn.textContent = t("🔍 对比: {value0} → {value1}", { value0: older.name, value1: newer.name });
         } else {
             this.compareBtn.style.display = 'none';
         }
@@ -602,27 +840,27 @@ class EditVersionModal extends obsidian.Modal {
     onOpen() {
         const {contentEl} = this;
         contentEl.empty();
-        contentEl.createEl('h2', {text: '编辑版本'});
+        contentEl.createEl('h2', {text: t("编辑版本")});
 
-        contentEl.createEl('label', {text: '版本名称'});
+        contentEl.createEl('label', {text: t("版本名称")});
         const nameInput = contentEl.createEl('input', {
             type: 'text', value: this.version.name,
             cls: 'modal-input'
         });
 
-        contentEl.createEl('label', {text: '版本描述'});
+        contentEl.createEl('label', {text: t("版本描述")});
         const descInput = contentEl.createEl('textarea', { cls: 'modal-textarea' });
         descInput.value = this.version.description || '';
 
         const btnContainer = contentEl.createDiv({ cls: 'modal-button-container' });
-        const cancelBtn = btnContainer.createEl('button', { text: '取消', cls: 'modal-cancel-btn' });
+        const cancelBtn = btnContainer.createEl('button', { text: t("取消"), cls: 'modal-cancel-btn' });
         cancelBtn.addEventListener('click', () => this.close());
 
-        const saveBtn = btnContainer.createEl('button', { text: '保存', cls: 'modal-save-btn' });
+        const saveBtn = btnContainer.createEl('button', { text: t("保存"), cls: 'modal-save-btn' });
         saveBtn.addEventListener('click', async () => {
             const newName = nameInput.value.trim();
             if (!newName) {
-                new obsidian.Notice('版本名称不能为空');
+                new obsidian.Notice(t("版本名称不能为空"));
                 return;
             }
             const success = await this.callbacks.update(this.version, newName, descInput.value.trim());
@@ -677,9 +915,9 @@ class DiffViewPane extends obsidian.ItemView {
     getViewType() { return DiffViewPane.VIEW_TYPE; }
     getDisplayText() {
         if (this.version1 && this.version2) {
-            return `对比: ${this.version1.name} vs ${this.version2.name}`;
+            return t("对比: {value0} → {value1}", { value0: this.version1.name, value1: this.version2.name });
         }
-        return '版本对比';
+        return t("版本对比");
     }
     getIcon() { return 'file-search'; }
 
@@ -688,15 +926,15 @@ class DiffViewPane extends obsidian.ItemView {
     }
 
     setState(state, result) {
-        this.version1 = state.version1;
-        this.version2 = state.version2;
+        [this.version1, this.version2] = state.version1 && state.version2
+            ? orderVersions(state.version1, state.version2) : [state.version1, state.version2];
         super.setState(state, result);
     }
 
     async onOpen() {
         this.contentEl.empty();
         if (!this.version1 || !this.version2) {
-            this.contentEl.createDiv({ cls: 'version-view-placeholder', text: '请先选择两个版本进行对比' });
+            this.contentEl.createDiv({ cls: 'version-view-placeholder', text: t("请先选择两个版本进行对比") });
             return;
         }
         this.renderContent();
@@ -773,7 +1011,9 @@ class DiffViewPane extends obsidian.ItemView {
         contentEl.empty();
 
         const headerEl = contentEl.createDiv({ cls: 'diff-header' });
-        headerEl.createEl('h2', { text: `版本对比: ${this.version1.name} vs ${this.version2.name}` });
+        headerEl.createEl('h2', { text: t("版本对比: {value0} → {value1}", { value0: this.version1.name, value1: this.version2.name }) });
+
+        headerEl.createDiv({ cls: 'diff-direction', text: t("旧版本 → 新版本") });
 
         const controlsEl = headerEl.createDiv({ cls: 'diff-controls' });
 
@@ -784,11 +1024,11 @@ class DiffViewPane extends obsidian.ItemView {
             this.showOnlyDiff = diffToggle.checked;
             this.renderContent();
         });
-        diffToggleLabel.createSpan({ text: '只显示差异' });
+        diffToggleLabel.createSpan({ text: t("只显示差异") });
 
         const viewBtn = controlsEl.createEl('button', {
             cls: 'diff-view-btn',
-            text: this.viewMode === 'split' ? '统一视图' : '拆分视图'
+            text: this.viewMode === 'split' ? t("统一视图") : t("拆分视图")
         });
         viewBtn.addEventListener('click', () => {
             this.viewMode = this.viewMode === 'split' ? 'unified' : 'split';
@@ -802,7 +1042,7 @@ class DiffViewPane extends obsidian.ItemView {
             : this.processedLines;
 
         if (filtered.length === 0) {
-            container.createDiv({ cls: 'diff-empty', text: '两个版本完全相同' });
+            container.createDiv({ cls: 'diff-empty', text: t("两个版本完全相同") });
             return;
         }
 
@@ -817,10 +1057,10 @@ class DiffViewPane extends obsidian.ItemView {
         const table = container.createDiv({ cls: 'diff-table' });
 
         const headerRow = table.createDiv({ cls: 'diff-header-row' });
-        headerRow.createDiv({ cls: 'diff-cell-line-num', text: '行号' });
-        headerRow.createDiv({ cls: 'diff-cell-content', text: this.version1.name });
-        headerRow.createDiv({ cls: 'diff-cell-line-num', text: '行号' });
-        headerRow.createDiv({ cls: 'diff-cell-content', text: this.version2.name });
+        headerRow.createDiv({ cls: 'diff-cell-line-num', text: t("行号") });
+        headerRow.createDiv({ cls: 'diff-cell-content', text: versionHeading(this.version1, true) });
+        headerRow.createDiv({ cls: 'diff-cell-line-num', text: t("行号") });
+        headerRow.createDiv({ cls: 'diff-cell-content', text: versionHeading(this.version2, false) });
 
         const body = container.createDiv({ cls: 'diff-body' });
 
@@ -890,6 +1130,7 @@ class DiffViewPane extends obsidian.ItemView {
     }
 
     renderUnifiedView(container, lines) {
+        container.createDiv({ cls: 'diff-version-summary', text: `${versionHeading(this.version1, true)} → ${versionHeading(this.version2, false)}` });
         const body = container.createDiv({ cls: 'diff-body' });
 
         const oldFm = new FrontmatterTracker();

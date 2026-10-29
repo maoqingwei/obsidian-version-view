@@ -4,6 +4,14 @@
 
 A simple version control plugin for Obsidian. Save, manage, compare and restore file versions with an intuitive interface.
 
+[简体中文](README_zh.md)
+
+## Language
+
+The interface follows Obsidian’s language setting: Chinese (`zh`, including regional variants) uses Simplified Chinese; other languages use English. After changing the app language, restart Obsidian to refresh all labels. Saved version names, descriptions, and note content are preserved.
+
+English translations adapted from [ThisIsKenta’s contribution in PR #2](https://github.com/maoqingwei/obsidian-version-view/pull/2).
+
 ## Features
 
 - **Save Version Snapshots** - Save current file version with optional name
@@ -39,14 +47,21 @@ A simple version control plugin for Obsidian. Save, manage, compare and restore 
 ## Usage
 
 1. Open any note
-2. Click the clock icon 🕐 in the ribbon, or run the command "切换版本视图"
-3. Enter a version name (optional) and click "保存此版本"
+2. Click the clock icon 🕐 in the ribbon, or run the command "Toggle Version View"
+3. Enter a version name (optional) and click "Save version"
 4. Use the action buttons for each version:
    - ✏️ Edit version name and description
    - 🔍 Compare with current document
    - ↩️ Restore to this version
    - 🗑️ Delete this version
 5. Select two versions with checkboxes to compare them directly
+
+## Saving, comparing, and restoring
+
+- The sidebar identifies the active note. While a version is being saved, the save button shows “Saving…” and ignores repeated clicks.
+- Comparisons always show the older version on the left and the newer version on the right, with names and timestamps. Comparing against the current note always puts the current note on the right. Red indicates removed content and green indicates added content from older to newer.
+- Before restoring, the plugin saves the current note as a “Before restore” version. If the backup fails, the note is not replaced.
+- Use **Undo restore** in the sidebar to undo the most recent restore for that note during the current plugin session. If you have edited the note since restoring, undo leaves those edits intact; compare with the backup to recover earlier content. The saved backup remains in the version list after restarting Obsidian.
 
 ## Settings
 

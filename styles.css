@@ -428,3 +428,49 @@
 .diff-body::-webkit-scrollbar-thumb:hover {
     background: var(--background-modifier-hover);
 }
+
+/* Note identity, operation feedback, and restore recovery */
+.version-view-file {
+    margin-top: 4px;
+    font-size: 13px;
+    color: var(--text-muted);
+    overflow-wrap: anywhere;
+}
+
+.version-view-name-input {
+    min-width: 0;
+}
+
+.version-view-save-btn:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+
+.version-view-undo {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin: 8px;
+    padding: 10px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 6px;
+    background: var(--background-secondary);
+    font-size: 12px;
+}
+
+.version-view-undo button {
+    white-space: nowrap;
+}
+
+.diff-direction,
+.diff-version-summary {
+    font-size: 12px;
+    color: var(--text-muted);
+    overflow-wrap: anywhere;
+}
+
+.diff-version-summary {
+    padding: 8px;
+    border-bottom: 1px solid var(--background-modifier-border);
+}
