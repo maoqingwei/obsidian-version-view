@@ -1,6 +1,6 @@
 # Version View - Obsidian 版本管理插件
 
-> **说明：** 本插件是基于原作者 [joeytoday](https://github.com/joeytoday) 的 [Version View](https://github.com/maoqingwei/obsidian-version-view) 插件重新构建的版本。原仓库缺少 `main.js` 文件，因此使用 AI 重新编写了完整代码，保留了所有原有功能并进行了优化。
+> **说明：** 本插件是基于原作者 [joeytoday](https://github.com/joeytoday) 的 Version View 插件重新构建的版本。原仓库缺少 `main.js` 文件，因此使用 AI 重新编写了完整代码，保留了所有原有功能并进行了优化。
 
 一个简单直观的 Obsidian 版本管理插件，支持保存、管理、对比和恢复文件版本。
 
@@ -8,7 +8,7 @@
 
 ## 界面语言
 
-界面跟随 Obsidian 的语言设置：中文（包含区域变体）显示简体中文，其他语言显示英文。更改应用语言后，请重启 Obsidian 以刷新全部界面文字。已保存的版本名称、描述和笔记内容保持原样。
+界面跟随 Obsidian 的语言设置：中文（包含区域变体）显示简体中文，其他语言显示英文。自动语言检测使用 Obsidian 1.8.7 起提供的公开接口；更早版本默认显示英文。更改应用语言后，请重启 Obsidian 以刷新全部界面文字。已保存的版本名称、描述和笔记内容保持原样。
 
 英文翻译参考 [ThisIsKenta 在 PR #2 中的贡献](https://github.com/maoqingwei/obsidian-version-view/pull/2)。
 

@@ -74,10 +74,10 @@ const ENGLISH = {
 
 function getInterfaceLanguage() {
     try {
-        // getLanguage is the public API; the stored setting supports older Obsidian versions.
+        // Use the public language API; older app versions fall back to English.
         const language = typeof obsidian.getLanguage === 'function'
             ? obsidian.getLanguage()
-            : (typeof localStorage !== 'undefined' ? localStorage.getItem('language') : 'en');
+            : 'en';
         return /^zh(?:[-_]|$)/i.test(language || '') ? 'zh' : 'en';
     } catch (_) {
         return 'en';

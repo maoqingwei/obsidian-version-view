@@ -38,7 +38,9 @@ function load(language, { legacy = false, unavailable = false } = {}) {
     const context = vm.createContext({
         require: name => { assert.equal(name, 'obsidian'); return obsidian; },
         module: { exports: {} }, console: { ...console, error: (...args) => errors.push(args) },
-        localStorage: { getItem: key => { assert.equal(key, 'language'); return language; } }
+        // Accessing browser storage must fail, even on older app versions.
+        get localStorage() { throw new Error('Browser storage access is forbidden'); },
+        get sessionStorage() { throw new Error('Browser storage access is forbidden'); }
     });
     vm.runInContext(source + '\n;globalThis.subject = { t, VersionService, VersionViewPane, DiffViewPane };', context);
     return { ...context.subject, Plugin: context.module.exports, notices, errors };
@@ -106,8 +108,8 @@ for (const language of ['zh', 'en']) {
     });
 }
 
-test('older Obsidian uses stored language; unavailable API falls back to English', () => {
-    assert.equal(load('zh', { legacy: true }).t('保存'), '保存');
+test('older Obsidian and unavailable language API fall back to English without browser storage', () => {
+    assert.equal(load('zh', { legacy: true }).t('保存'), 'Save');
     assert.equal(load(null, { legacy: true }).t('保存'), 'Save');
     assert.equal(load('zh', { unavailable: true }).t('保存'), 'Save');
 });

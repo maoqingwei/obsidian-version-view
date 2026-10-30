@@ -1,6 +1,6 @@
 # Version View for Obsidian
 
-> **Note:** This is a community-maintained fork of the original [Version View](https://github.com/joeytoday/obsidian-version-view) plugin by [joeytoday](https://github.com/joeytoday). The original repository was missing the `main.js` file, so this plugin has been rebuilt from scratch using AI to provide a fully functional version with all features intact.
+> **Note:** This community-maintained rebuild is based on the original Version View plugin by [joeytoday](https://github.com/joeytoday). The original repository was missing `main.js`, so this implementation was rebuilt using AI. The maintained repository, releases, and issue tracker are at [maoqingwei/obsidian-version-view](https://github.com/maoqingwei/obsidian-version-view).
 
 A simple version control plugin for Obsidian. Save, manage, compare and restore file versions with an intuitive interface.
 
@@ -8,7 +8,7 @@ A simple version control plugin for Obsidian. Save, manage, compare and restore 
 
 ## Language
 
-The interface follows Obsidian’s language setting: Chinese (`zh`, including regional variants) uses Simplified Chinese; other languages use English. After changing the app language, restart Obsidian to refresh all labels. Saved version names, descriptions, and note content are preserved.
+The interface follows Obsidian’s language setting: Chinese (`zh`, including regional variants) uses Simplified Chinese; other languages use English. Automatic language detection uses the public API available in Obsidian 1.8.7 and later; older versions fall back to English. After changing the app language, restart Obsidian to refresh all labels. Saved version names, descriptions, and note content are preserved.
 
 English translations adapted from [ThisIsKenta’s contribution in PR #2](https://github.com/maoqingwei/obsidian-version-view/pull/2).
 
