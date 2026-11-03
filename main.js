@@ -2,6 +2,11 @@ const obsidian = require('obsidian');
 
 // Keep translations in this file so manual installation still needs only three files.
 const ENGLISH = {
+    "更多操作": "More actions",
+    "选择版本 {value0} 进行对比": "Select version {value0} for comparison",
+    "选择两个版本进行对比（已选 {value0}/2）": "Select two versions to compare ({value0}/2 selected)",
+    "今天 {value0}": "Today {value0}",
+    "昨天 {value0}": "Yesterday {value0}",
     "保存版本": "Save version",
     "保存中…": "Saving…",
     "未选择笔记": "No note selected",
@@ -105,6 +110,22 @@ function versionHeading(version, older) {
         value0: version.name,
         value1: new Date(version.timestamp).toLocaleString()
     });
+}
+
+function compactVersionTime(timestamp, now = new Date()) {
+    const date = new Date(timestamp);
+    const locale = getInterfaceLanguage() === 'zh' ? 'zh-CN' : 'en';
+    const time = date.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit', hour12: false });
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const day = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+    if (day === today.getTime()) return t("今天 {value0}", { value0: time });
+    if (day === yesterday.getTime()) return t("昨天 {value0}", { value0: time });
+    return `${date.toLocaleDateString(locale, {
+        ...(date.getFullYear() !== now.getFullYear() ? { year: 'numeric' } : {}),
+        month: 'short', day: 'numeric'
+    })} ${time}`;
 }
 
 function escapeHtml(text) {
@@ -608,7 +629,14 @@ class VersionViewPane extends obsidian.ItemView {
         });
 
         this.saveBtn = inputContainer.createEl('button', { cls: 'version-view-save-btn', text: t("保存版本") });
+        this.saveBtn.addClass('mod-cta');
         this.saveBtn.addEventListener('click', () => this.saveCurrentVersion());
+        this.nameInput.addEventListener('keydown', event => {
+            if (event.key === 'Enter' && !event.isComposing && event.keyCode !== 229) {
+                event.preventDefault();
+                this.saveCurrentVersion();
+            }
+        });
         this.updateSaveState();
 
         this.undoContainer = contentEl.createDiv({ cls: 'version-view-undo' });
@@ -624,6 +652,9 @@ class VersionViewPane extends obsidian.ItemView {
         this.compareBtn.style.display = 'none';
         this.compareBtn.addEventListener('click', () => this.compareSelected());
 
+        this.selectionHint = contentEl.createDiv({ cls: 'version-view-selection-hint' });
+        this.selectionHint.setAttribute('aria-live', 'polite');
+        this.selectionHint.style.display = 'none';
         this.listEl = contentEl.createDiv({ cls: 'version-view-list' });
 
         this.emptyEl = contentEl.createDiv({ cls: 'version-view-placeholder' });
@@ -674,6 +705,7 @@ class VersionViewPane extends obsidian.ItemView {
         this.fileLabel.title = this.file ? this.file.path : '';
         this.updateSaveState();
         this.updateUndoState();
+        this.updateCompareBtn();
         if (!this.file) {
             this.listEl.empty();
             this.listEl.style.display = 'none';
@@ -723,6 +755,7 @@ class VersionViewPane extends obsidian.ItemView {
         this.selectedVersions = [];
         this.compareBtn.style.display = 'none';
 
+        this.updateCompareBtn();
         if (this.versions.length === 0) {
             this.listEl.createEl('p', { text: t("暂无版本") });
             return;
@@ -733,62 +766,62 @@ class VersionViewPane extends obsidian.ItemView {
             const row1 = card.createDiv({ cls: 'version-item-row1' });
 
             const checkbox = row1.createEl('input', { type: 'checkbox', cls: 'version-item-checkbox' });
-            const tag = row1.createDiv({ cls: 'version-item-tag' });
-            tag.setText(`V${version.id}`);
-            const nameEl = row1.createDiv({ cls: 'version-item-name' });
-            nameEl.setText(version.name);
-            const buttonsEl = row1.createDiv({ cls: 'version-item-actions' });
-
-            const editBtn = buttonsEl.createEl('button', { text: '✏️', cls: 'version-item-btn' });
-            editBtn.title = t("编辑");
-            editBtn.addEventListener('click', () => {
-                new EditVersionModal(this.app, version, {
-                    update: (v, name, desc) => this.plugin.versionService.updateVersion(file, v.id, name, desc),
-                    onDone: () => this.file === file && this.loadVersions()
-                }).open();
+            checkbox.setAttribute('aria-label', t("选择版本 {value0} 进行对比", { value0: version.name }));
+            const details = row1.createDiv({ cls: 'version-item-details' });
+            const heading = details.createDiv({ cls: 'version-item-heading' });
+            heading.createSpan({ cls: 'version-item-tag', text: `#${version.id}` });
+            const nameEl = heading.createDiv({ cls: 'version-item-name', text: version.name });
+            nameEl.title = version.name;
+            const timeEl = details.createEl('time', {
+                cls: 'version-item-time', text: compactVersionTime(version.timestamp)
             });
-
-            const diffBtn = buttonsEl.createEl('button', { text: '🔍', cls: 'version-item-btn' });
-            diffBtn.title = t("与当前对比");
+            timeEl.title = new Date(version.timestamp).toLocaleString();
+            timeEl.setAttribute('datetime', new Date(version.timestamp).toISOString());
+            if (version.description) {
+                details.createDiv({ cls: 'version-item-desc', text: version.description });
+            }
+            const buttonsEl = card.createDiv({ cls: 'version-item-actions' });
+            const diffBtn = buttonsEl.createEl('button', { text: t("与当前对比"), cls: 'version-item-btn version-item-compare' });
             diffBtn.addEventListener('click', async () => {
                 const currentContent = await this.app.vault.read(file);
                 this.plugin.openDiffView(version, {
-                    name: t("当前文档"),
-                    timestamp: Date.now(),
-                    content: currentContent,
-                    isCurrent: true
+                    name: t("当前文档"), timestamp: Date.now(), content: currentContent, isCurrent: true
                 });
             });
-
-            const restoreBtn = buttonsEl.createEl('button', { text: '↩️', cls: 'version-item-btn' });
-            restoreBtn.title = t("恢复");
-            restoreBtn.addEventListener('click', async () => {
-                if (this.isRestoring) return;
-                if (!confirm(t('恢复 "{value0}" 将覆盖当前笔记。继续前会自动保存当前内容的备份。', { value0: version.name }))) return;
-                this.isRestoring = true;
-                restoreBtn.disabled = true;
-                try {
-                    await this.plugin.versionService.restoreVersion(version, file);
-                    if (this.file === file) await this.loadVersions();
-                } finally {
-                    this.isRestoring = false;
-                    restoreBtn.disabled = false;
-                }
+            const moreBtn = buttonsEl.createEl('button', { cls: 'version-item-btn version-item-more' });
+            obsidian.setIcon(moreBtn, 'more-horizontal');
+            moreBtn.title = t("更多操作");
+            moreBtn.setAttribute('aria-label', t("更多操作"));
+            moreBtn.setAttribute('aria-haspopup', 'menu');
+            moreBtn.addEventListener('click', () => {
+                const menu = new obsidian.Menu();
+                menu.addItem(item => item.setTitle(t("编辑")).setIcon('pencil').onClick(() => {
+                    new EditVersionModal(this.app, version, {
+                        update: (v, name, desc) => this.plugin.versionService.updateVersion(file, v.id, name, desc),
+                        onDone: () => this.file === file && this.loadVersions()
+                    }).open();
+                }));
+                menu.addItem(item => item.setTitle(t("恢复")).setIcon('history').onClick(async () => {
+                    if (this.isRestoring) return;
+                    if (!confirm(t('恢复 "{value0}" 将覆盖当前笔记。继续前会自动保存当前内容的备份。', { value0: version.name }))) return;
+                    this.isRestoring = true;
+                    try {
+                        await this.plugin.versionService.restoreVersion(version, file);
+                        if (this.file === file) await this.loadVersions();
+                    } finally {
+                        this.isRestoring = false;
+                    }
+                }));
+                menu.addSeparator();
+                menu.addItem(item => item.setTitle(t("删除")).setIcon('trash-2').onClick(async () => {
+                    if (confirm(t("确定要删除版本 \"{value0}\" 吗？", { value0: version.name }))) {
+                        await this.plugin.versionService.deleteVersion(file, version.id);
+                        if (this.file === file) await this.loadVersions();
+                    }
+                }));
+                const bounds = moreBtn.getBoundingClientRect();
+                menu.showAtPosition({ x: bounds.left, y: bounds.bottom });
             });
-
-            const deleteBtn = buttonsEl.createEl('button', { text: '🗑️', cls: 'version-item-btn' });
-            deleteBtn.title = t("删除");
-            deleteBtn.addEventListener('click', async () => {
-                if (confirm(t("确定要删除版本 \"{value0}\" 吗？", { value0: version.name }))) {
-                    await this.plugin.versionService.deleteVersion(file, version.id);
-                    if (this.file === file) await this.loadVersions();
-                }
-            });
-
-            if (version.description) {
-                card.createDiv({ cls: 'version-item-desc', text: version.description });
-            }
-            card.createDiv({ cls: 'version-item-time', text: new Date(version.timestamp).toLocaleString() });
 
             checkbox.addEventListener('change', () => {
                 if (checkbox.checked) {
@@ -809,6 +842,8 @@ class VersionViewPane extends obsidian.ItemView {
     }
 
     updateCompareBtn() {
+        this.selectionHint.style.display = this.file && this.versions.length > 0 ? '' : 'none';
+        this.selectionHint.setText(t("选择两个版本进行对比（已选 {value0}/2）", { value0: this.selectedVersions.length }));
         if (this.selectedVersions.length === 2) {
             this.compareBtn.style.display = 'block';
             const [older, newer] = orderVersions(...this.selectedVersions);

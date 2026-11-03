@@ -49,12 +49,10 @@ English translations adapted from [ThisIsKenta’s contribution in PR #2](https:
 1. Open any note
 2. Click the clock icon 🕐 in the ribbon, or run the command "Toggle Version View"
 3. Enter a version name (optional) and click "Save version"
-4. Use the action buttons for each version:
-   - ✏️ Edit version name and description
-   - 🔍 Compare with current document
-   - ↩️ Restore to this version
-   - 🗑️ Delete this version
-5. Select two versions with checkboxes to compare them directly
+4. Each card shows its version number, full name, and a compact timestamp (hover for the full date and time).
+5. Click **Compare with Current Version** to inspect changes. Open **More actions** (⋯) to edit, restore, or delete a version.
+6. Select two versions with checkboxes to compare them directly; the selection hint shows progress.
+7. Press Enter in the version name field to save. Confirming text with an input method does not trigger saving.
 
 ## Saving, comparing, and restoring
 

@@ -16,6 +16,7 @@ class Element {
     createDiv(options) { return this.createEl('div', options); }
     createSpan(options) { return this.createEl('span', options); }
     addClass() {}
+    getBoundingClientRect() { return { left: 20, bottom: 40 }; }
     setAttribute(name, value) { this[name] = value; }
     addEventListener(name, callback) { this.listeners[name] = callback; }
     empty() { this.children = []; }
@@ -26,7 +27,23 @@ class Element {
 function load(language, { legacy = false, unavailable = false } = {}) {
     const notices = [];
     const errors = [];
+    const menus = [];
+    const confirmations = [];
     const obsidian = {
+        setIcon: (element, icon) => { element.icon = icon; },
+        Menu: class {
+            constructor() { this.items = []; menus.push(this); }
+            addItem(callback) {
+                const item = {
+                    setTitle(value) { this.title = value; return this; },
+                    setIcon(value) { this.icon = value; return this; },
+                    onClick(value) { this.callback = value; return this; }
+                };
+                callback(item); this.items.push(item); return this;
+            }
+            addSeparator() { return this; }
+            showAtPosition(position) { this.position = position; }
+        },
         Plugin: class {}, PluginSettingTab: class {}, Modal: class {},
         ItemView: class { constructor() { this.contentEl = new Element(); } },
         Notice: class { constructor(message) { notices.push(message); } }
@@ -37,13 +54,14 @@ function load(language, { legacy = false, unavailable = false } = {}) {
     };
     const context = vm.createContext({
         require: name => { assert.equal(name, 'obsidian'); return obsidian; },
+        confirm: message => { confirmations.push(message); return true; },
         module: { exports: {} }, console: { ...console, error: (...args) => errors.push(args) },
         // Accessing browser storage must fail, even on older app versions.
         get localStorage() { throw new Error('Browser storage access is forbidden'); },
         get sessionStorage() { throw new Error('Browser storage access is forbidden'); }
     });
-    vm.runInContext(source + '\n;globalThis.subject = { t, VersionService, VersionViewPane, DiffViewPane };', context);
-    return { ...context.subject, Plugin: context.module.exports, notices, errors };
+    vm.runInContext(source + '\n;globalThis.subject = { t, compactVersionTime, VersionService, VersionViewPane, DiffViewPane };', context);
+    return { ...context.subject, Plugin: context.module.exports, notices, errors, menus, confirmations };
 }
 
 for (const language of ['zh', 'zh-CN', 'zh-TW', 'zh_HK', 'en', 'de', null]) {
@@ -285,4 +303,75 @@ test('comparison always opens older on the left, including reversed selection an
     const live = { timestamp: 0, isCurrent: true };
     await plugin.openDiffView(live, newer);
     assert.equal(state.version2, live);
+});
+
+
+for (const language of ['zh', 'en']) {
+    test(`sidebar cards keep full names and expose safe secondary actions: ${language}`, async () => {
+        const { VersionViewPane, menus, confirmations } = load(language);
+        const file = { path: 'a.md' }, other = { path: 'b.md' };
+        const versions = [1, 2, 3].map(id => ({ id, name: `很长的完整版本名称 ${id}`, timestamp: Date.now(), content: 'snapshot' }));
+        const actions = [];
+        const pane = new VersionViewPane({}, { versionService: {
+            getVersions: async () => versions,
+            canUndoRestore: () => false,
+            restoreVersion: async (version, target) => actions.push(['restore', target, version.id]),
+            deleteVersion: async (target, id) => actions.push(['delete', target, id])
+        }, openDiffView: (older, newer) => actions.push(['compare', older, newer]) });
+        pane.app = { vault: { read: async target => { assert.equal(target, file); return 'current'; } } };
+        pane.buildUI(); pane.file = file;
+        await pane.loadVersions();
+        const cards = pane.listEl.children;
+        const first = cards[0].all();
+        assert.ok(first.some(el => el.text === versions[0].name && el.title === versions[0].name));
+        assert.ok(first.some(el => el.text === '#1'));
+        assert.equal(first.filter(el => el.tag === 'button').length, 2);
+        const checkboxes = cards.map(card => card.all().find(el => el.type === 'checkbox'));
+        checkboxes[0].checked = true; checkboxes[0].listeners.change();
+        assert.ok(pane.selectionHint.text.includes('1/2'));
+        checkboxes[1].checked = true; checkboxes[1].listeners.change();
+        assert.equal(pane.compareBtn.style.display, 'block');
+        checkboxes[2].checked = true; checkboxes[2].listeners.change();
+        assert.equal(checkboxes[2].checked, false);
+        assert.ok(pane.selectionHint.text.includes('2/2'));
+        const buttons = first.filter(el => el.tag === 'button');
+        await buttons[0].listeners.click();
+        assert.equal(actions[0][2].content, 'current');
+        buttons[1].listeners.click();
+        assert.equal(buttons[1].icon, 'more-horizontal');
+        assert.deepEqual(menus[0].items.map(item => item.icon), ['pencil', 'history', 'trash-2']);
+        assert.equal(menus[0].items[1].title, language === 'zh' ? '恢复' : 'Restore this version');
+        // Menu callbacks stay bound to their original note after the active note changes.
+        pane.file = other;
+        await menus[0].items[1].callback();
+        await menus[0].items[2].callback();
+        assert.equal(actions[1][1], file);
+        assert.equal(actions[2][1], file);
+        assert.equal(confirmations.length, 2);
+    });
+}
+
+test('Enter saves but IME composition does not submit', () => {
+    const { VersionViewPane } = load('zh');
+    const pane = new VersionViewPane({}, {});
+    pane.buildUI();
+    let saved = 0, prevented = 0;
+    pane.saveCurrentVersion = () => saved++;
+    const keydown = pane.nameInput.listeners.keydown;
+    const event = { key: 'Enter', preventDefault: () => prevented++ };
+    keydown({ ...event, isComposing: true });
+    keydown({ ...event, keyCode: 229 });
+    keydown({ ...event, key: 'a' });
+    assert.equal(saved, 0);
+    keydown(event);
+    assert.equal(saved, 1);
+    assert.equal(prevented, 1);
+});
+
+test('compact times distinguish today, yesterday and prior years without seconds', () => {
+    const { compactVersionTime } = load('zh');
+    const now = new Date(2026, 10, 3, 18);
+    assert.equal(compactVersionTime(new Date(2026, 10, 3, 17, 55, 53).getTime(), now), '今天 17:55');
+    assert.equal(compactVersionTime(new Date(2026, 10, 2, 17, 55).getTime(), now), '昨天 17:55');
+    assert.ok(compactVersionTime(new Date(2025, 9, 30, 17, 39).getTime(), now).includes('2025'));
 });
